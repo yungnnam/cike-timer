@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 折叠态：只有「类型 + 时间」一行，高度压在系统给的 64dp 里，不会被裁 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/notif_bg"
+    android:paddingLeft="14dp"
+    android:paddingRight="14dp"
+    android:paddingTop="9dp"
+    android:paddingBottom="9dp">
+
+    <TextView
+        android:id="@+id/nt_type"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:includeFontPadding="false"
+        android:text="编程" />
+
+    <Chronometer
+        android:id="@+id/nt_clock"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:textSize="22sp"
+        android:textColor="#FFFFFF"
+        android:fontFamily="monospace"
+        android:includeFontPadding="false" />
+
+    <TextView
+        android:id="@+id/nt_clock_static"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:visibility="gone"
+        android:textSize="19sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:fontFamily="monospace"
+        android:includeFontPadding="false"
+        android:text="1 小时 05 分" />
+</LinearLayout>

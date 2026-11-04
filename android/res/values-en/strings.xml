@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 系统语言是英文时用这套：桌面图标显示 Cike，通知栏、对话框、导出路径也都是英文。-->
+<resources>
+    <string name="app_name">Cike</string>
+
+    <string name="chooser_pick_file">Choose a backup file</string>
+    <string name="dlg_ok">OK</string>
+    <string name="dlg_confirm">Continue</string>
+    <string name="dlg_cancel">Cancel</string>
+
+    <string name="backup_file_name">cike-backup.json</string>
+    <string name="backup_dir">Cike</string>
+    <string name="backup_dir_legacy">Backups</string>
+    <string name="saved_to">Saved to %1$s</string>
+    <string name="save_failed">Could not save — try another name</string>
+    <string name="downloads_prefix">Download/%1$s/</string>
+
+    <string name="notif_channel">Timer running</string>
+    <string name="notif_channel_desc">Shows the current type and elapsed time in the notification while a timer runs</string>
+    <string name="notif_recording">Recording</string>
+    <string name="notif_paused">Paused</string>
+    <string name="dur_hm">%1$dh %2$dm</string>
+    <string name="dur_m">%1$d min</string>
+</resources>

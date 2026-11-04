@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 默认（中文）资源。英文系统走 values-en/strings.xml。-->
+<resources>
+    <string name="app_name">此刻</string>
+
+    <!-- 文件选择 / 对话框按钮 -->
+    <string name="chooser_pick_file">选择备份文件</string>
+    <string name="dlg_ok">好</string>
+    <string name="dlg_confirm">确定</string>
+    <string name="dlg_cancel">取消</string>
+
+    <!-- 导出备份 -->
+    <string name="backup_file_name">此刻备份.json</string>
+    <string name="backup_dir">此刻</string>
+    <string name="backup_dir_legacy">备份</string>
+    <string name="saved_to">已存到 %1$s</string>
+    <string name="save_failed">没存成，换个名字试试</string>
+    <string name="downloads_prefix">下载/%1$s/</string>
+
+    <!-- 通知栏 -->
+    <string name="notif_channel">正在计时</string>
+    <string name="notif_channel_desc">记录进行中时，在通知栏显示当前类型和已经过去的时间</string>
+    <string name="notif_recording">正在记录</string>
+    <string name="notif_paused">已暂停</string>
+    <string name="dur_hm">%1$d 小时 %2$d 分</string>
+    <string name="dur_m">%1$d 分钟</string>
+</resources>

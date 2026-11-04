@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 展开态（下拉之后）：类型 / 大字时间 / 副标题，三行都放得下 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/notif_bg"
+    android:paddingLeft="14dp"
+    android:paddingRight="14dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="11dp">
+
+    <TextView
+        android:id="@+id/nt_type"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="17sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:text="编程" />
+
+    <Chronometer
+        android:id="@+id/nt_clock"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:textSize="26sp"
+        android:textColor="#FFFFFF"
+        android:fontFamily="monospace"
+        android:includeFontPadding="false" />
+
+    <TextView
+        android:id="@+id/nt_clock_static"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:visibility="gone"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:fontFamily="monospace"
+        android:includeFontPadding="false"
+        android:text="1 小时 05 分" />
+
+    <TextView
+        android:id="@+id/nt_note"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="12sp"
+        android:textColor="#B9BDC9"
+        android:text="已暂停" />
+</LinearLayout>

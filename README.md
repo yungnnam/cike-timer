@@ -27,6 +27,11 @@ an offline Android APK. Interface available in Chinese and English.
 
 **隐私** 无账号、无云同步、无统计上报、无第三方 SDK。网页版数据存在浏览器配置里，APK 数据存在应用私有目录，卸载会一并删除，因此建议定期导出备份。
 
+
+| Now | 统计 | 通知 |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/now.png" width="250" alt="Now" /> | <img src="docs/screenshots/shot.png" width="250" alt="Stats" /> | <img src="docs/screenshots/notification.png" width="250" alt="Notification" /> |
+
 ---
 
 ## Design principles

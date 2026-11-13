@@ -5,6 +5,20 @@ All notable changes to 此刻 / Cike.
 The build stamp shown under *Me → About → Build* (`cike-vNN`) identifies the asset bundle and
 changes on every build, independently of the semantic version.
 
+## v1.2.4 — 2026-11-13
+
+- **Added**: *Stats scope* under *Me* — pick any number of groups and types; selecting a group
+  includes all of its sub-types. Stored as `focusIds` in settings, pruned when a type is deleted.
+- **Added**: a 12-week heat map on the Stats page (one column per week, one cell per day, shade
+  proportional to that day's duration, today outlined). It counts only the selected scope and
+  falls back to all types when the scope is empty, so the same page can answer "how consistent
+  have I been with *this* group" and "how busy was I overall".
+- **Added**: English strings and composition rules for the heat map (month labels, `Last 12
+  weeks: …`, `… days logged`, empty-scope notice).
+- **Internal**: `.tmp/focuscheck.mjs`, 23 assertions over scope resolution (group expands to
+  sub-types, dead ids are pruned), day-splitting of cross-midnight entries, empty-scope
+  rendering and agreement between the card total and `clipped()`.
+
 ## v1.2.3 — 2026-11-04
 
 - **Fixed**: remaining English-mode gaps in the goals empty state, the haptics description and

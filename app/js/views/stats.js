@@ -4,7 +4,7 @@
 
 import {
   state, typeById, sumByType, clipped, startOfDay, startOfWeek, startOfMonth,
-  goalProgress, isGroup, descendants, running,
+  goalProgress, isGroup, descendants, running, focusSet, focusSummary,
 } from '../store.js';
 import { fmtDur, fmtDurS, hexA, shadeFor } from '../format.js';
 import { esc } from '../ui.js';
@@ -250,6 +250,8 @@ export function render() {
       </div>${kids.length ? `<div class="rank-sub">${kids.slice(0, 4).map((k) => `<span><i style="--c:${k.type?.color || '#8B93A7'}"></i>${esc(k.type?.name || '未分类')} ${fmtDurS(k.ms)}</span>`).join('')}</div>` : ''}`;
     }).join('')}
   </section>`}
+
+  ${weekHeat(now)}
 
   ${goalsCard(now)}
   `;
@@ -513,6 +515,86 @@ function heatCard(cur, rows) {
       <span class="muted">${top ? `最多的是${esc(top.type?.name || '未分类')}` : '深浅 = 投入多少'}</span></div>
     <div class="heat">${lines}</div>
     <div class="heat-x"><span></span>${[0, 4, 8, 12, 16, 20].map((h) => `<span>${h}时</span>`).join('')}</div>
+  </section>`;
+}
+
+/* 周热力图：最近 12 周 × 一周七天，每格 = 那一天的合计时长。
+   和上面「一周节奏」分工不同：那边看「一周里哪个时段」，
+   这边看「哪些天真的在投入」，跨十来周看连续性最直观。
+   只算用户在「我的 → 关注范围」里挑出来的分组/类型；没挑就是全部。 */
+const WEEKS = 12;
+const LV_ALPHA = [0, 0.22, 0.42, 0.62, 0.86];
+
+function weekHeat(now) {
+  const set = focusSet();
+  const curWeek = startOfWeek(now);
+  const from = curWeek - (WEEKS - 1) * 7 * DAY;
+  const byDay = new Map();
+  let total = 0;
+
+  for (const c of clipped(from, now, now)) {
+    if (set && !set.has(c.rec.typeId)) continue;
+    // 一段可能跨过零点，按天切开，不然「昨晚 23:40 到今早 0:30」会被算到一天里
+    let a = c.s;
+    const e = Math.min(c.e, now);
+    while (a < e) {
+      const d0 = startOfDay(a);
+      const b = Math.min(e, d0 + DAY);
+      byDay.set(d0, (byDay.get(d0) || 0) + (b - a));
+      total += b - a;
+      a = b;
+    }
+  }
+
+  if (!total && !set) return '';     // 什么都没记、也没设范围：不占位置
+  let active = 0;
+  let max = 1;
+  byDay.forEach((ms) => { if (ms > 0) { active += 1; if (ms > max) max = ms; } });
+
+  const ws = state.settings.weekStart ?? 1;
+  const nameOf = ['日', '一', '二', '三', '四', '五', '六'];
+  const today = startOfDay(now);
+  const cols = [];
+
+  for (let w = 0; w < WEEKS; w++) {
+    const wkStart = from + w * 7 * DAY;
+    // 月份标签：这一周里出现了 1 号就往回贴一个，省得 12 列挤满字
+    let label = '';
+    for (let i = 0; i < 7; i++) {
+      const d0 = wkStart + i * DAY;
+      const d = new Date(d0);
+      if (d.getDate() === 1 || (w === 0 && i === 0)) label = `${d.getMonth() + 1}月`;
+    }
+    const cells = [];
+    for (let i = 0; i < 7; i++) {
+      const d0 = startOfDay(wkStart + i * DAY);
+      const ms = byDay.get(d0) || 0;
+      const lv = ms > 0 ? Math.min(4, 1 + Math.floor((ms / max) * 3.999)) : 0;
+      const d = new Date(d0);
+      const tip = `${d.getMonth() + 1}月${d.getDate()}日 · ${ms ? fmtDurS(ms) : '没记录'}`;
+      cells.push(`<i class="wkc l${lv}${d0 === today ? ' today' : ''}" title="${tip}" style="--a:${LV_ALPHA[lv]}"></i>`);
+    }
+    cols.push(`<div class="wk-col"><b>${label}</b>${cells.join('')}</div>`);
+  }
+
+  const axis = Array.from({ length: 7 }, (_, i) => `<span>${nameOf[(ws + i) % 7]}</span>`).join('');
+  const hint = set
+    ? `${focusSummary()} · 最近 ${WEEKS} 周共 ${fmtDur(total)}`
+    : `最近 ${WEEKS} 周共 ${fmtDur(total)} · 全部类型`;
+  const empty = total === 0
+    ? `<div class="muted" style="margin-top:10px">这 ${WEEKS} 周里，选中的范围还没有记录。</div>`
+    : '';
+
+  return `<section class="card glass">
+    <div class="card-h"><span class="card-t">周热力图</span>
+      <span class="muted">${set ? esc(focusSummary()) : '全部类型'}</span></div>
+    <div class="wk-wrap">
+      <div class="wk-axis">${axis}</div>
+      <div class="wk">${cols.join('')}</div>
+    </div>
+    <div class="wk-foot muted">${hint}${total ? ` · 有记录的 ${active} 天` : ''}</div>
+    ${empty}
+    <div class="wk-legend"><span>少</span>${LV_ALPHA.map((a) => `<i class="wkc" style="--a:${a}"></i>`).join('')}<span>多</span></div>
   </section>`;
 }
 

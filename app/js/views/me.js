@@ -4,6 +4,7 @@ import {
   state, typeById, liveTypes, elapsed, saveSettings, exportBundle, importBundle,
   wipeAll, goalProgress, totalMs, seedDemo,
   topTypes, childTypes, groupList, isGroup, followLangNames,
+  focusIds, focusSummary,
 } from '../store.js';
 import { fmtDur, fmtISO, hexA } from '../format.js';
 import { openTypeEditor, openGoalEditor } from '../editors.js';
@@ -117,6 +118,15 @@ export function render() {
     </button>
   </div>
 
+  <div class="sec-t">统计范围</div>
+  <div class="list glass">
+    <button class="li" data-act="focus">
+      <span class="dot" style="--c:var(--accent);background:transparent;border:1.5px solid color-mix(in srgb, var(--accent) 65%, transparent)"></span>
+      <span class="tt">关注的分组与类型<small>周热力图只算选中的这些；不选就是全部</small></span>
+      <span class="vv" style="max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(focusSummary())}<svg class="ic chev"><use href="#i-chevron"/></svg></span>
+    </button>
+  </div>
+
   <div class="sec-t">目标</div>
   <div class="list glass">
     ${state.goals.length ? state.goals.map((g) => {
@@ -201,8 +211,8 @@ export function render() {
   <div class="sec-t">关于</div>
   <div class="list glass">
     <div class="li">
-      <span class="tt">此刻 <small>v1.2.3 正式版</small></span>
-      <span class="vv">构建 cike-v40</span>
+      <span class="tt">此刻 <small>v1.2.4 正式版</small></span>
+      <span class="vv">构建 cike-v41</span>
     </div>
     <div class="li" style="display:block;color:var(--text-3);font-size:12.5px;line-height:1.7">
       所有数据只存在这台设备上，不上传、不需要账号。加到主屏幕后跟普通 App 一样用；装成 APK 时数据在应用自己的目录里，卸载会一起删掉，换机前记得先导一份备份。
@@ -268,6 +278,7 @@ export function mount(root) {
       toast(state.settings.haptics === false ? '点按震动已关闭' : '点按震动已开启');
     }
     if (act === 'day-start') openDayStartSheet();
+    if (act === 'focus') openFocusSheet();
     if (act === 'notify-settings') {
       // 先去系统设置页看一眼；如果通知权限本身还没给，顺手再问一次
       const st = notifyStatus();
@@ -291,6 +302,76 @@ export function mount(root) {
       toast('记录和目标已清空', { undoable: true });
     }
   });
+}
+
+/**
+ * 关注范围：统计页的周热力图只算这里勾上的分组/类型。
+ * 勾分组 = 整组（子类型自动算进来，子项显示成「随分组」不可单独取消）；
+ * 不勾分组时，子类型可以一个个挑 —— 只想看「英语」不想要「编程」也能做到。
+ */
+function openFocusSheet() {
+  const picked = new Set(focusIds());
+
+  const row = (t, kid, derived) => {
+    const on = derived || picked.has(t.id);
+    return `<button class="f-row${kid ? ' kid' : ''}${on ? ' on' : ''}${derived ? ' derived' : ''}" data-fid="${t.id}">
+      <span class="fc"></span>
+      <span class="dot" style="--c:${t.color};background:${t.color}"></span>
+      <span class="tt">${esc(t.name)}${!kid && isGroup(t) ? `<small>整个分组 · ${childTypes(t.id).length} 个子类型</small>` : (kid ? '<small>只算它自己</small>' : '')}</span>
+    </button>`;
+  };
+
+  const list = () => topTypes().map((t) => {
+    if (!isGroup(t)) return row(t, false, false);
+    const derived = picked.has(t.id);
+    return row(t, false, false) + childTypes(t.id).map((k) => row(k, true, derived)).join('');
+  }).join('');
+
+  const body = `<div class="f-list" data-flist>${list()}</div>
+    <div class="muted" style="margin-top:14px;font-size:12px;line-height:1.6">
+      这里是「看什么」，不是「记什么」：没选中的类型照样可以记，只是不画进周热力图。
+    </div>`;
+
+  openSheet({
+    title: '关注的分组与类型',
+    sub: '统计页的周热力图只算这些；一个都不选就是全部',
+    body,
+    foot: '<button class="btn" data-do="clear">全部类型</button><button class="btn primary" data-do="save">保存</button>',
+    onMount(sheet, { close }) {
+      const box = sheet.querySelector('[data-flist]');
+      const repaint = () => { box.innerHTML = list(); };
+
+      sheet.addEventListener('click', async (e) => {
+        const r = e.target.closest('.f-row');
+        if (r && !r.classList.contains('derived')) {
+          const id = r.dataset.fid;
+          if (picked.has(id)) picked.delete(id);
+          else {
+            picked.add(id);
+            // 勾了整个分组，再单独勾子类型就重复了，去掉
+            if (isGroup(typeById(id))) descendantsOf(id).forEach((k) => picked.delete(k));
+          }
+          repaint();
+          return;
+        }
+        const b = e.target.closest('[data-do]');
+        if (!b) return;
+        if (b.dataset.do === 'clear') { picked.clear(); repaint(); return; }
+        if (b.dataset.do === 'save') {
+          await saveSettings({ focusIds: Array.from(picked) });
+          close();
+          window.__app.render();
+          const src = focusIds();
+          toast(src.length ? `周热力图只统计 ${focusSummary()}` : '周热力图统计全部类型');
+        }
+      });
+    },
+  });
+}
+
+/** 分组下所有层级的子类型 id（含孙子），只给上面的选择器用 */
+function descendantsOf(id) {
+  return childTypes(id).flatMap((k) => [k.id, ...descendantsOf(k.id)]);
 }
 
 function openDayStartSheet() {

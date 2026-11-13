@@ -283,6 +283,23 @@ const EN = {
   '分布': 'Breakdown',
   '排行': 'Ranking',
   '一周节奏': 'Rhythm of the week',
+  '周热力图': 'Weekly heatmap',
+  '少': 'Less',
+  '多': 'More',
+  '全部类型': 'All types',
+  '没记录': 'no entries',
+  /* —— 「我的 → 关注的分组与类型」—— */
+  '统计范围': 'Stats scope',
+  '关注的分组与类型': 'Focus groups and types',
+  '周热力图只算选中的这些；不选就是全部':
+    'The weekly heatmap counts only these; none = all',
+  '统计页的周热力图只算这些；一个都不选就是全部':
+    'The weekly heatmap counts only these; leave all unchecked for everything',
+  '整个分组': 'Whole group',
+  '只算它自己': 'Only this type',
+  '这里是「看什么」，不是「记什么」：没选中的类型照样可以记，只是不画进周热力图。':
+    'This decides what the heatmap shows, not what you can log: unchecked types still record, they just stay out of the heatmap.',
+  '周热力图统计全部类型': 'Heatmap now counts all types',
   '项': 'items',
   '个类型': 'types',
   '个分组': 'groups',
@@ -495,6 +512,17 @@ const RULES = [
   [/^(\d+) 小时$/, (m) => `${m[1]} h`],
   [/^(\d+) 月$/, (m) => MONTHS[(Number(m[1]) - 1) % 12]],
   [/^(\d{4}) 年 (\d+) 月$/, (m) => `${MONTHS[(Number(m[2]) - 1) % 12]} ${m[1]}`],
+
+  /* —— 周热力图与关注范围 —— */
+  [/^整个分组 · (\d+) 个子类型$/, (m) => `Whole group · ${m[1]} subtypes`],
+  // 顺序要紧：长的先用（「… · 有记录的 N 天」先剥掉尾巴，再翻前面的合计）
+  [/^(.+) · 有记录的 (\d+) 天$/, (m) => `${t(m[1])} · ${m[2]} days logged`],
+  [/^(.+) · 最近 (\d+) 周共 (.+)$/, (m) => `${t(m[1])} · last ${m[2]} weeks: ${m[3]}`],
+  [/^最近 (\d+) 周共 ([^·]+)$/, (m) => `Last ${m[1]} weeks: ${m[2]}`],
+  [/^周热力图只统计 (.+)$/, (m) => `Heatmap now counts only ${t(m[1])}`],
+  [/^这 (\d+) 周里，选中的范围还没有记录。$/,
+    (m) => `No entries for the selected range in the last ${m[1]} weeks.`],
+  [/^(\d+)月(\d+)日 · (.+)$/, (m) => `${MONTHS[(Number(m[1]) - 1) % 12]} ${m[2]} · ${t(m[3])}`],
 ];
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

@@ -21,6 +21,7 @@
   --line: rgba(255, 255, 255, .08);
   --shadow: 0 24px 60px -26px rgba(0, 0, 0, .92);
   --accent: #6c7bff;
+  --wk0: rgba(255, 255, 255, .045);   /* 周热力图里「没记录」那格 */
   --nav-h: 62px;
   /* 导航条的竖向占位（条 + 底部安全区 + 12px 底距）。只有浮层（抽屉/吐司）
      需要从底部往上让；页面本身由网格第一行决定，不再拼 calc。 */
@@ -43,6 +44,7 @@ html[data-theme="light"] {
   --sheet-bg: linear-gradient(180deg, rgba(255, 255, 255, .97), rgba(244, 246, 251, .99));
   --line: rgba(18, 20, 27, .09);
   --shadow: 0 24px 60px -30px rgba(20, 30, 60, .32);
+  --wk0: rgba(18, 20, 27, .07);
   color-scheme: light;
 }
 
@@ -974,6 +976,49 @@ html[data-fx="solid"] .tile.on::before { animation: none; }
 .heat-x { display: flex; gap: 4px; margin-top: 7px; }
 .heat-x span { flex: 1; text-align: center; font-size: 10px; color: var(--text-3); }
 .heat-x span:first-child { width: 15px; flex: none; }
+
+/* 周热力图：12 列（周）× 7 行（周一…周日），格子的深浅 = 那天投入多少。
+   格子用 --a 控制透明度，颜色统一取主色，所以切换主题时不用另写一套色值。 */
+.wk-wrap { display: flex; gap: 6px; margin-top: 13px; }
+.wk-axis { display: flex; flex-direction: column; gap: 3px; width: 13px; flex: none; padding-top: 13px; }
+.wk-axis span { height: 13px; line-height: 13px; font-size: 9.5px; color: var(--text-3); text-align: center; }
+.wk { display: flex; gap: 3px; flex: 1; min-width: 0; }
+.wk-col { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.wk-col b {
+  height: 13px; line-height: 13px; font-size: 9px; font-weight: 500; color: var(--text-3);
+  text-align: center; white-space: nowrap; overflow: hidden;
+}
+.wkc {
+  display: block; height: 13px; border-radius: 3px; min-width: 0;
+  background: color-mix(in srgb, var(--accent, #6c7bff) calc(var(--a, 0) * 100%), var(--wk0));
+}
+.wkc.today { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent, #6c7bff) 70%, transparent); }
+.wk-foot { margin-top: 11px; font-size: 11.5px; line-height: 1.55; }
+.wk-legend { display: flex; align-items: center; gap: 4px; margin-top: 11px; font-size: 10px; color: var(--text-3); }
+.wk-legend .wkc { width: 13px; height: 13px; flex: none; }
+
+/* 「关注的分组与类型」选择器：分组一行，子类型缩进一行；勾上是实心方块 + 勾 */
+.f-list { display: flex; flex-direction: column; gap: 1px; }
+.f-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 10px 8px; border: 0; background: transparent; color: inherit;
+  border-radius: 12px; text-align: left; font: inherit;
+}
+.f-row:active { background: rgba(255, 255, 255, .05); }
+.f-row.kid { padding-left: 26px; }
+.f-row .fc {
+  position: relative; width: 18px; height: 18px; border-radius: 6px;
+  border: 1.5px solid var(--text-3); flex: none; transition: background .16s, border-color .16s;
+}
+.f-row.on .fc { background: var(--accent); border-color: var(--accent); }
+.f-row.on .fc::after {
+  content: ''; position: absolute; left: 5px; top: 1.5px; width: 4.5px; height: 8.5px;
+  border: 2px solid #fff; border-top: 0; border-left: 0; transform: rotate(42deg);
+}
+.f-row.derived { opacity: .55; }
+.f-row .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.f-row .tt { flex: 1; min-width: 0; font-size: 14px; }
+.f-row .tt small { display: block; font-size: 11px; color: var(--text-3); margin-top: 1px; }
 
 html[data-theme="light"] .kpi { background: rgba(255, 255, 255, .62); }
 html[data-theme="light"] .rank .delta.up { color: #2f7d55; background: rgba(47, 125, 85, .1); }

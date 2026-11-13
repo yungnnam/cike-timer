@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS = {
   fx: 'solid',      // 只有 pure solid 一种界面：不透明底 + 细线，无毛玻璃、无光晕
   haptics: true,    // 点按时轻微震动
   undoMs: 5000,     // 撤销提示条停留多久（毫秒）：3 / 5 / 8 / 10 秒可选
+  focusIds: [],     // 统计只看这些分组/类型（空 = 全部）；选中分组时子类型自动算进来
   tipDone: false,   // 「三件事就够用了」那张提示卡关掉了没有
   dayStart: 0,      // 一天的起点（0-6 点）
   weekStart: 1,     // 1 = 周一
@@ -178,6 +179,35 @@ export function typePath(id) {
   if (!t) return '未分类';
   const p = t.parentId ? typeById(t.parentId) : null;
   return p ? `${p.name} / ${t.name}` : t.name;
+}
+
+/* ---------------- 关注范围 ----------------
+   统计页的「周热力图」只算用户挑出来的分组和类型。
+   存的是 id 数组：选分组就是整个分组（子类型自动展开），选子类型就只算它。
+   空数组 = 不筛选，全部类型。 */
+export function focusIds() {
+  const raw = Array.isArray(state.settings.focusIds) ? state.settings.focusIds : [];
+  // 类型删掉之后设置里可能留着死 id，读的时候顺手滤掉
+  return raw.filter((id) => !!typeById(id));
+}
+
+/** 展开成一组具体类型 id；没设过返回 null（= 全部） */
+export function focusSet() {
+  const ids = focusIds();
+  if (!ids.length) return null;
+  const set = new Set();
+  for (const id of ids) {
+    set.add(id);
+    for (const kid of descendants(id)) set.add(kid);
+  }
+  return set;
+}
+
+/** 一句说明：「全部类型」/「学习、编程」/「学习、编程 等 4 项」 */
+export function focusSummary() {
+  const names = focusIds().map((id) => typeById(id)?.name || '').filter(Boolean);
+  if (!names.length) return '全部类型';
+  return names.length <= 2 ? names.join('、') : `${names.slice(0, 2).join('、')} 等 ${names.length} 项`;
 }
 
 /* 按顶级类型汇总（分组合并子类型），统计页环形图和排行用 */
@@ -799,6 +829,9 @@ export async function importBundle(obj) {
   state.goals = cleanGoals(obj.goals, new Set(state.types.map((t) => t.id)));
   if (obj.settings && typeof obj.settings === 'object') {
     state.settings = { ...DEFAULT_SETTINGS, ...obj.settings };
+    // 备份里的关注范围可能指向这份文件里没有的类型，落地前先滤一遍
+    const have = new Set(state.types.map((t) => t.id));
+    state.settings.focusIds = (Array.isArray(state.settings.focusIds) ? state.settings.focusIds : []).filter((id) => have.has(id));
   }
   await persistAll();
   emit();

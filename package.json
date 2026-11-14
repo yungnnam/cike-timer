@@ -1,0 +1,7 @@
+{
+  "name": "cike",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "此刻 · 时间记录（PWA，零依赖）"
+}

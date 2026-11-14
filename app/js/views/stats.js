@@ -5,9 +5,11 @@
 import {
   state, typeById, sumByType, clipped, startOfDay, startOfWeek, startOfMonth,
   goalProgress, isGroup, descendants, running, focusSet, focusSummary,
+  mainSet, mainSummary,
 } from '../store.js';
 import { fmtDur, fmtDurS, hexA, shadeFor } from '../format.js';
-import { esc } from '../ui.js';
+import { esc, openSheet, toast } from '../ui.js';
+import { openScopeSheet } from '../scopesheet.js';
 
 const DAY = 86400000;
 const BUCKET = 4;              // 一周节奏：每格 4 小时
@@ -15,7 +17,8 @@ const ACCENT = '#6C7BFF';
 
 let range = 'week';
 
-const RANGE_LABEL = { today: '今天', week: '本周', month: '本月', year: '今年' };
+// 区间：今天、昨天各自是一整天；昨天没有「跨零点算到哪天」的问题，直接取前一天 0 点
+const RANGE_LABEL = { today: '今天', yesterday: '昨天', week: '本周', month: '本月', year: '今年' };
 
 /* 占比可以换三种画法：实心饼（默认）、环形、条形。
    记在 localStorage 里，刷新后还是上次选的那种。 */
@@ -82,6 +85,11 @@ function bounds() {
     e.setFullYear(e.getFullYear() + 1);
     return [s, e.getTime()];
   }
+  if (range === 'yesterday') {
+    // 昨天 = 今天 0 点往前推 24 小时（「一天从几点开始」已经算在 startOfDay 里了）
+    const s = startOfDay(now) - DAY;
+    return [s, s + DAY];
+  }
   const s = startOfDay(now);
   return [s, s + DAY];
 }
@@ -92,9 +100,11 @@ function rangeLabel(from) {
   return yearOffset === 0 ? '今年' : `${yearOf(from)} 年`;
 }
 
-/** 把区间裁成一段段，顺手算出：顶级类型合计、按小时、按「星期×时段」、条数、最长一段 */
+/** 把区间裁成一段段，顺手算出：顶级类型合计、按小时、按「星期×时段」、条数、最长一段。
+    只算「主要显示范围」里的类型（没设范围就是全部），周热力图自己另算一套。 */
 function agg(from, to, now) {
   const end = Math.min(to, now);
+  const scope = mainSet();
   const top = new Map();
   const byHour = new Array(24).fill(0);
   const cell = new Map();      // "星期-第几格" → 毫秒
@@ -105,6 +115,7 @@ function agg(from, to, now) {
   let count = 0;
 
   for (const c of clipped(from, to, now)) {
+    if (scope && !scope.has(c.rec.typeId)) continue;
     total += c.ms;
     count += 1;
     if (c.ms > longest) longest = c.ms;
@@ -154,6 +165,14 @@ const colorOf = (s) => s?.tint || s?.type?.color || '#8B93A7';
 /* 分布柱 / 热力图里按类型 id 找颜色，走的也是这一套变体 */
 let tintMap = new Map();
 
+/** 页头那句副标题：每段各自成块。窄屏一行放不下时整段挪到下一行，
+    不至于把「最投入 10–11 点」拆成「最」+「投入 10–11 点」两截。
+    段间的「·」交给 CSS（.h-sub .s + .s::before）画，别写进文字里：
+    英文是逐段替换的，文字里带的分隔符会占着翻译后的位置。 */
+function subLine(parts) {
+  return parts.filter(Boolean).map((p) => `<span class="s">${p}</span>`).join('');
+}
+
 export function render() {
   const now = Date.now();
   const [from, to] = bounds();
@@ -173,16 +192,78 @@ export function render() {
   const rest = Math.max(0, span - cur.total);
   const pct = prev.total > 0 ? ((cur.total - prev.total) / prev.total) * 100 : null;
   const peak = peakHour(cur.byHour);
+  const scoped = mainSet() !== null;
 
-  const sub = `${rangeLabel(from)} · 共 ${fmtDur(cur.total)}`
-    + (pct === null ? '' : ` · 比上期 ${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%`)
-    + (cur.total && peak ? ` · 最投入 ${peak.h}–${peak.h + 1} 点` : '');
+  const sub = subLine([
+    rangeLabel(from),
+    scoped ? `只看 ${esc(mainSummary())}` : '',
+    `共 ${fmtDur(cur.total)}`,
+    pct === null ? '' : `比上期 ${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%`,
+    cur.total && peak ? `最投入 ${peak.h}–${peak.h + 1} 点` : '',
+  ]);
+
+  /* 主图那几张卡：占比（图 + 旁边的时长清单）、分布、一周节奏 */
+  const space = `<div class="stats-pair">
+  <section class="card glass stats-hero">
+    <div class="chart-picks">
+      <div class="seg-ctrl mini" data-chart-pick>
+        ${CHART_LABEL.map(([v, l]) => `<button class="${chartKind === v ? 'on' : ''}" data-chart="${v}">${l}</button>`).join('')}
+      </div>
+      <div class="seg-ctrl mini" data-grain-pick>
+        ${GRAIN_LABEL.map(([v, l]) => `<button class="${grain === v ? 'on' : ''}" data-grain="${v}">${l}</button>`).join('')}
+      </div>
+    </div>
+    ${chartBody(rows, cur.total)}
+    <div class="kpis">
+      <div class="kpi">${kpiDur(cur.total / daysElapsed)}<span>日均</span></div>
+      <div class="kpi"><b>${cur.count}</b><span>条记录</span></div>
+      <div class="kpi">${kpiDurS(cur.longest)}<span>最长一段</span></div>
+      <div class="kpi">${kpiDur(rest)}<span>未记录</span></div>
+    </div>
+  </section>
+  ${hoursCard(now)}
+  </div>
+
+  <section class="card glass">
+    <div class="card-h"><span class="card-t">分布</span>
+      <span class="muted">${range === 'today' || range === 'yesterday' ? '0 – 24 时' : range === 'week' ? '本周 7 天' : range === 'month' ? '本月每天' : `${yearOf(from)} 年每月`}</span></div>
+    ${bars(from, to, now)}
+  </section>
+
+  ${heatCard(cur, rows)}`;
+
+  /* 排行：按顺序放在周热力图后面（两块都是「往下拉才看得到的细账」） */
+  const rankCard = `<section class="card glass">
+    <div class="card-h"><span class="card-t">排行</span>
+      <span class="muted">${rows.length} ${grain === 'type' ? '个类型' : '项'}</span></div>
+    ${rows.slice(0, 10).map((s) => {
+      const share = (s.ms / cur.total) * 100;
+      const c = colorOf(s);
+      const kids = kidRows(s, from, to, now);
+      const before = prev.top.get(s.typeId) || 0;
+      const diff = s.ms - before;
+      // 差不到 1 分钟就不写「↑0分」了：昨天跟前天一样长时，四行都挂着 0 很吵
+      const delta = Math.abs(diff) >= 60000
+        ? `<span class="delta ${diff >= 0 ? 'up' : 'down'}">${diff >= 0 ? '↑' : '↓'}${fmtDurS(Math.abs(diff))}</span>`
+        : '';
+      return `<div class="rank" style="--c:${c}">
+        <i class="dot"></i>
+        <span class="nm">${esc(s.type?.name || '未分类')}</span>
+        ${delta}
+        <span class="pct">${share.toFixed(0)}%</span>
+        <span class="dur">${fmtDurS(s.ms)}</span>
+      </div>${kids.length ? `<div class="rank-sub">${kids.slice(0, 4).map((k) => `<span><i style="--c:${k.type?.color || '#8B93A7'}"></i>${esc(k.type?.name || '未分类')} ${fmtDurS(k.ms)}</span>`).join('')}</div>` : ''}`;
+    }).join('')}
+  </section>`;
 
   return `
   <div class="top">
     <div>
       <h1 class="h-title">统计</h1>
       <div class="h-sub">${sub}</div>
+    </div>
+    <div class="h-act">
+      <button class="icon-btn" data-act="stats-set" aria-label="统计设置"><svg class="ic"><use href="#i-gear"/></svg></button>
     </div>
   </div>
 
@@ -195,76 +276,28 @@ export function render() {
     </span>` : ''}
   </div>
 
-  ${cur.total === 0 ? `<section class="card glass"><div class="empty" style="padding:44px 0">${rangeLabel(from)}还没有记录</div></section>` : `
-  <div class="stats-pair">
-  <section class="card glass stats-hero">
-    <div class="chart-picks">
-      <div class="seg-ctrl mini" data-chart-pick>
-        ${CHART_LABEL.map(([v, l]) => `<button class="${chartKind === v ? 'on' : ''}" data-chart="${v}">${l}</button>`).join('')}
-      </div>
-      <div class="seg-ctrl mini" data-grain-pick>
-        ${GRAIN_LABEL.map(([v, l]) => `<button class="${grain === v ? 'on' : ''}" data-grain="${v}">${l}</button>`).join('')}
-      </div>
-    </div>
-    ${chartBody(rows, cur.total)}
-    <div class="legend">
-      ${rows.slice(0, 5).map((s) => `<span><i style="--c:${colorOf(s)}"></i>${esc(s.type?.name || '未分类')}<b>${pctStr(s.ms, cur.total)}</b></span>`).join('')}
-      ${rows.length > 5 ? `<span class="more">等 ${rows.length} 类</span>` : ''}
-    </div>
-    <div class="kpis">
-      <div class="kpi"><b>${fmtDur(cur.total / daysElapsed)}</b><span>日均</span></div>
-      <div class="kpi"><b>${cur.count}</b><span>条记录</span></div>
-      <div class="kpi"><b>${fmtDurS(cur.longest)}</b><span>最长一段</span></div>
-      <div class="kpi"><b>${fmtDur(rest)}</b><span>未记录</span></div>
-    </div>
-  </section>
-  ${hoursCard(now)}
-  </div>
-
-  <section class="card glass">
-    <div class="card-h"><span class="card-t">分布</span>
-      <span class="muted">${range === 'today' ? '0 – 24 时' : range === 'week' ? '本周 7 天' : range === 'month' ? '本月每天' : `${yearOf(from)} 年每月`}</span></div>
-    ${bars(from, to, now)}
-  </section>
-
-  ${heatCard(cur, rows)}
-
-  <section class="card glass">
-    <div class="card-h"><span class="card-t">排行</span>
-      <span class="muted">${rows.length} ${grain === 'type' ? '个类型' : '项'}</span></div>
-    ${rows.slice(0, 10).map((s) => {
-      const share = (s.ms / cur.total) * 100;
-      const c = colorOf(s);
-      const kids = kidRows(s, from, to, now);
-      const before = prev.top.get(s.typeId) || 0;
-      const diff = s.ms - before;
-      const delta = before > 0 || diff > 0
-        ? `<span class="delta ${diff >= 0 ? 'up' : 'down'}">${diff >= 0 ? '↑' : '↓'}${fmtDurS(Math.abs(diff))}</span>`
-        : '';
-      return `<div class="rank" style="--c:${c}">
-        <i class="dot"></i>
-        <span class="nm">${esc(s.type?.name || '未分类')}</span>
-        ${delta}
-        <span class="pct">${share.toFixed(0)}%</span>
-        <span class="dur">${fmtDurS(s.ms)}</span>
-      </div>${kids.length ? `<div class="rank-sub">${kids.slice(0, 4).map((k) => `<span><i style="--c:${k.type?.color || '#8B93A7'}"></i>${esc(k.type?.name || '未分类')} ${fmtDurS(k.ms)}</span>`).join('')}</div>` : ''}`;
-    }).join('')}
-  </section>`}
+  ${cur.total === 0
+    ? `<section class="card glass"><div class="empty" style="padding:44px 0">${scoped ? '这个范围里还没有记录' : `${rangeLabel(from)}还没有记录`}</div></section>`
+    : space}
 
   ${weekHeat(now)}
+
+  ${cur.total === 0 ? '' : rankCard}
 
   ${goalsCard(now)}
   `;
 }
 
-/** 分组下的子类型明细，只给分组用；按类型看的时候每行本身就是类型，不用再拆 */
+/** 分组下的子类型明细，只给分组用；按类型看的时候每行本身就是类型，不用再拆。
+    明细也得跟着「主要显示范围」走，不然范围外的小项会混进排行下面那行小字。 */
 function kidRows(s, from, to, now) {
   if (grain === 'type') return [];
   if (!s.type || !isGroup(s.type)) return [];
   const ids = new Set(descendants(s.typeId));
+  const scope = mainSet();
   // 子类型跟分组同色，这里也按名次调深浅，排行下面的小点才分得开
   return paint(Array.from(sumByType(from, to, now).entries())
-    .filter(([tid]) => ids.has(tid))
+    .filter(([tid]) => ids.has(tid) && (!scope || scope.has(tid)))
     .map(([tid, ms]) => ({ typeId: tid, type: typeById(tid), ms }))
     .sort((a, b) => b.ms - a.ms));
 }
@@ -315,38 +348,143 @@ function inkFor(hex) {
   return l > 150 ? '#0e1118' : '#ffffff';
 }
 
-/** 实心饼：名字和百分比直接写在扇区里（只写占比 ≥5% 的，免得挤成一团） */
-function pie(rows, total) {
-  const cx = 80;
-  const cy = 80;
-  const R = 74;
+/** 同侧的时间标签按 y 排开，互相不压：先照原位置排，再整体上推/下压，最后夹回画布 */
+function spreadLabels(boxes, minGap, top, bottom) {
+  boxes.sort((a, b) => a.y - b.y);
+  const place = () => {
+    for (let i = 0; i < boxes.length; i += 1) {
+      boxes[i].y = i ? Math.max(boxes[i].y, boxes[i - 1].y + minGap) : Math.max(boxes[i].y, top);
+    }
+  };
+  place();
+  const over = boxes.length ? boxes[boxes.length - 1].y - bottom : 0;
+  if (over > 0) { boxes.forEach((b) => { b.y -= over; }); place(); }
+  return boxes;
+}
+
+/** 扇区外的时间标签：从每块的外缘引一条折线到左右两侧，写在图外。
+    小扇区里塞不下「1时24分」这种长度，挤在图上会互相压住，
+    挪到外面每个扇区的时长才都读得清（名字和占比仍留在扇区里）。 */
+function leadLayer(slices, g) {
+  const { cx, cy, r, H } = g;
+  const right = [];
+  const left = [];
+  for (const it of slices) {
+    // 不到一分钟的碎块不挂标签：写出来只有「0分」，还把旁边的挤开
+    if (it.s.ms < 60000) continue;
+    const x = cx + Math.cos(it.mid) * (r + 4);
+    const y = cy + Math.sin(it.mid) * (r + 4);
+    (x >= cx ? right : left).push({ it, y });
+  }
+  spreadLabels(right, 13, 12, H - 12);
+  spreadLabels(left, 13, 12, H - 12);
+  const side = (boxes, dir) => boxes.map(({ it, y }) => {
+    const a = it.mid;
+    const c = colorOf(it.s);
+    const p1x = cx + Math.cos(a) * r;
+    const p1y = cy + Math.sin(a) * r;
+    const p2x = cx + Math.cos(a) * (r + 8);
+    const p2y = cy + Math.sin(a) * (r + 8);
+    const ex = cx + dir * (r + 14);
+    const tx = cx + dir * (r + 18);
+    return `<path class="pl-line" stroke="${c}"
+      d="M ${p1x.toFixed(1)} ${p1y.toFixed(1)}L ${p2x.toFixed(1)} ${p2y.toFixed(1)}L ${ex.toFixed(1)} ${y.toFixed(1)}"/>
+      <text class="pl-d" x="${tx.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${dir > 0 ? 'start' : 'end'}"
+        dominant-baseline="central">${fmtDurS(it.s.ms)}</text>`;
+  }).join('');
+  return side(right, 1) + side(left, -1);
+}
+
+/** 画布：宽度固定，高度按「标签最多那一侧」算 —— 三块时不留上下两条空带，
+    十几块时也不会把标签挤到一起。圆始终居中（cy = H / 2）。 */
+function chartBox(slices, R) {
+  let right = 0;
+  let left = 0;
+  for (const it of slices) {
+    if (Math.cos(it.mid) >= 0) right += 1;
+    else left += 1;
+  }
+  const H = Math.max(2 * R + 26, Math.max(right, left) * 13 + 26);
+  return { W: 310, H: Math.round(H), cx: 155, cy: Math.round(H) / 2 };
+}
+
+/** 实心饼：扇区里写名字和占比（只写占比 ≥5% 的，免得挤成一团），图外挂时间 */
+function pieChart(rows, total) {
+  const R = 62;
   let a = -Math.PI / 2;
-  const parts = rows.map((s) => {
+  const slices = rows.map((s) => {
     const frac = s.ms / total;
     const a0 = a;
-    const a1 = a + frac * (Math.PI * 2);
+    const a1 = a + frac * Math.PI * 2;
     a = a1;
+    return { s, frac, a0, a1, mid: (a0 + a1) / 2 };
+  });
+  const { W, H, cx, cy } = chartBox(slices, R);
+  // 只有一块时没有「哪块是哪块」的问题：名字、占比、时长都写在圆心，
+  // 从圆心拉一条指引线出去反而像指错了地方
+  if (slices.length === 1) {
+    const s = slices[0].s;
+    const ink = inkFor(colorOf(s));
+    return `<div class="chart-leads"><svg class="pie" viewBox="0 0 ${W} ${H}">
+      <circle class="sl" cx="${cx}" cy="${cy}" r="${R}" fill="${colorOf(s)}"/>
+      <text class="p-lb" x="${cx}" y="${cy - 9}" fill="${ink}"
+        text-anchor="middle" dominant-baseline="central">${esc((s.type?.name || '未分类').slice(0, 6))} 100%</text>
+      <text class="p-ct" x="${cx}" y="${cy + 10}" fill="${ink}"
+        text-anchor="middle" dominant-baseline="central">${fmtDurS(s.ms)}</text>
+    </svg></div>`;
+  }
+  const shapes = slices.map(({ s, frac, a0, a1 }) => {
     const color = colorOf(s);
-    const shape = frac >= 0.9999
-      ? `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${color}"/>`
-      : `<path d="${arcPath(cx, cy, R, a0, a1)}" fill="${color}" stroke="var(--glass-bg)" stroke-width="1"/>`;
-    let label = '';
-    if (frac >= 0.9999) {
-      // 一天只有一件事：圆心里写名字，不然整块彩色里一个字都没有
-      const nm = (s.type?.name || '未分类').slice(0, 5);
-      label = `<text class="p-lb" x="${cx}" y="${cy}" fill="${inkFor(color)}"
-        text-anchor="middle" dominant-baseline="central">${esc(nm)} 100%</text>`;
-    } else if (frac >= 0.05) {
-      const mid = (a0 + a1) / 2;
-      const lx = cx + Math.cos(mid) * R * 0.6;
-      const ly = cy + Math.sin(mid) * R * 0.6;
-      const nm = (s.type?.name || '未分类').slice(0, 4);
-      label = `<text class="p-lb" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" fill="${inkFor(color)}"
-        text-anchor="middle" dominant-baseline="central">${esc(nm)} ${Math.round(frac * 100)}%</text>`;
-    }
-    return shape + label;
+    return `<path class="sl" d="${arcPath(cx, cy, R, a0, a1)}" fill="${color}"
+      stroke="var(--glass-bg)" stroke-width="1"/>`;
   }).join('');
-  return `<svg class="pie" viewBox="0 0 160 160">${parts}</svg>`;
+  const inner = slices.map(({ s, frac, mid }) => {
+    if (frac < 0.05) return '';
+    const lx = cx + Math.cos(mid) * R * 0.6;
+    const ly = cy + Math.sin(mid) * R * 0.6;
+    const nm = (s.type?.name || '未分类').slice(0, 4);
+    return `<text class="p-lb" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" fill="${inkFor(colorOf(s))}"
+      text-anchor="middle" dominant-baseline="central">${esc(nm)} ${Math.round(frac * 100)}%</text>`;
+  }).join('');
+  return `<div class="chart-leads"><svg class="pie" viewBox="0 0 ${W} ${H}">
+    ${shapes}${inner}${leadLayer(slices, { cx, cy, r: R + 1, H })}
+  </svg></div>`;
+}
+
+/** 环形的一段弧（用 stroke 画，比 path 扇区省事，也方便留缝） */
+function ringArc(cx, cy, r, a0, a1, color) {
+  const x0 = cx + r * Math.cos(a0);
+  const y0 = cy + r * Math.sin(a0);
+  const x1 = cx + r * Math.cos(a1);
+  const y1 = cy + r * Math.sin(a1);
+  const big = a1 - a0 > Math.PI ? 1 : 0;
+  return `<path d="M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${big} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}"
+    fill="none" stroke="${color}" stroke-width="13"/>`;
+}
+
+/** 环形图：中间留空放总数，外面同样挂时间标签 */
+function ringChart(rows, total) {
+  const R = 62;
+  let a = -Math.PI / 2;
+  const slices = rows.map((s) => {
+    const frac = s.ms / total;
+    const a0 = a;
+    const a1 = a + frac * Math.PI * 2;
+    a = a1;
+    return { s, frac, a0, a1, mid: (a0 + a1) / 2 };
+  });
+  const { W, H, cx, cy } = chartBox(slices, R);
+  const arcs = slices.map(({ s, frac, a0, a1 }) => {
+    const gap = frac > 0.04 ? 0.016 : 0;
+    return ringArc(cx, cy, R, a0 + gap, a1 - gap, colorOf(s));
+  }).join('');
+  return `<div class="chart-leads">
+    <svg class="donut leads" viewBox="0 0 ${W} ${H}">
+      <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="var(--line)" stroke-width="13"/>
+      ${arcs}${slices.length > 1 ? leadLayer(slices, { cx, cy, r: R + 8, H }) : ''}
+    </svg>
+    <div class="pie-c"><div class="v">${big(total)}</div><div class="k">共记录</div></div>
+  </div>`;
 }
 
 /** 条形：一行一个类型，长度就是占比，比读数快 */
@@ -362,23 +500,29 @@ function hBars(rows, total) {
   }).join('')}</div>`;
 }
 
-/** 主图：按选的画法切换，环形才有中心大数字 */
+/** 主图：按选的画法切换。饼图和环形把时长用指引线写到图外 ——
+    扇区里只放名字和占比，时间一律在图外读，小扇区也不会缺数。 */
 function chartBody(rows, total) {
   if (chartKind === 'bar') return hBars(rows, total);
-  if (chartKind === 'ring') {
-    return `<div class="donut-wrap">${donut(rows, total)}
-      <div class="donut-c">
-        <div class="v">${big(total)}</div>
-        <div class="k">共记录</div>
-      </div>
-    </div>`;
-  }
-  return `<div class="donut-wrap">${pie(rows, total)}</div>`;
+  return chartKind === 'ring' ? ringChart(rows, total) : pieChart(rows, total);
 }
 
 function big(ms) {
   const v = ms >= 3600000 ? (ms / 3600000).toFixed(1) : Math.round(ms / 60000);
-  return `${v}<span style="font-size:14px;font-weight:500">${ms >= 3600000 ? ' 小时' : ' 分钟'}</span>`;
+  return `${v}<span class="u">${ms >= 3600000 ? ' 小时' : ' 分钟'}</span>`;
+}
+
+/** KPI 里的时长：三段数字（135小时27分）在窄屏会被省略号切掉，降一号字 */
+function kpiCell(html, len) {
+  return `<b${len >= 7 ? ' class="sm"' : ''}>${html}</b>`;
+}
+function kpiDur(ms) {
+  const s = fmtDur(ms);
+  return kpiCell(s, s.length);
+}
+function kpiDurS(ms) {
+  const s = fmtDurS(ms);
+  return kpiCell(s, s.length);
 }
 
 /** 占比文字：小于 1% 但不为 0 的写成「<1%」，别显示成 0% 让人以为没记录 */
@@ -390,7 +534,8 @@ function pctStr(ms, total) {
 
 /** 周期里「一共多久」的说法：一天 24 小时 / 一周 168 小时 / 本月 30 天 / 今年 12 个月 */
 function spanName(span, from) {
-  if (range === 'today') return '一天 24 小时';
+  // 昨天和今天一样是完整一天，只是日子不同
+  if (range === 'today' || range === 'yesterday') return '一天 24 小时';
   if (range === 'week') return '一周 168 小时';
   if (range === 'month') return `本月 ${Math.round(span / DAY)} 天`;
   return `${new Date(from).getFullYear()} 年全年`;
@@ -403,6 +548,7 @@ function spanText(from, to) {
     return `${x.getMonth() + 1} 月 ${x.getDate()} 日`;
   };
   if (range === 'today') return '0:00 – 24:00';
+  if (range === 'yesterday') return `${d(from)} 0:00 – 24:00`;
   if (range === 'week') return `${d(from)} – ${d(to - 1)}`;
   if (range === 'month') return `${d(from)} – ${d(to - 1)}`;
   const y = new Date(from).getFullYear();
@@ -422,7 +568,7 @@ function hoursCard(now) {
   const passed = Math.max(0, Math.min(now, to) - from);
   const future = Math.max(0, to - Math.max(now, from));
   const futureTip = future > 600000 ? `（之后 ${fmtDur(future)} 还没到）` : '';
-  const blankWord = range === 'today' ? '空白' : '未记';
+  const blankWord = range === 'today' || range === 'yesterday' ? '空白' : '未记';
   return `<section class="card glass hours-card">
     <div class="card-h"><span class="card-t">${spanName(span, from)}</span>
       <span class="muted">${rangeLabel(from)} · 已记 ${pct}%</span></div>
@@ -445,7 +591,7 @@ function hoursCard(now) {
 function bars(from, to, now) {
   const buckets = [];
   let labels = [];
-  if (range === 'today') {
+  if (range === 'today' || range === 'yesterday') {
     for (let h = 0; h < 24; h++) buckets.push([from + h * 3600000, from + (h + 1) * 3600000]);
     labels = ['0', '', '', '3', '', '', '6', '', '', '9', '', '', '12', '', '', '15', '', '', '18', '', '', '21', '', ''];
   } else if (range === 'week') {
@@ -466,9 +612,11 @@ function bars(from, to, now) {
     labels = buckets.map(([s], i) => (i === 0 || (i + 1) % 5 === 0 ? String(new Date(s).getDate()) : ''));
   }
 
+  const scope = mainSet();
   const per = buckets.map(([a, b]) => {
     const m = new Map();
     for (const c of clipped(a, b, now)) {
+      if (scope && !scope.has(c.rec.typeId)) continue;
       const top = topIdOf(c.rec);
       m.set(top, (m.get(top) || 0) + c.ms);
     }
@@ -621,8 +769,75 @@ function goalsCard(now) {
   </section>`;
 }
 
+/* 统计设置里的两项范围。键是「主要显示范围 / 周热力图范围」，
+   值分别是勾选抽屉要的文案和落库字段 —— 两处共用 scopesheet.js 那套勾选逻辑。 */
+const SCOPE_UI = {
+  main: {
+    key: 'mainIds',
+    title: '主要显示范围',
+    desc: '占比、分布、一周节奏、排行均按此范围统计',
+    sub: '统计页除周热力图外均按此范围统计；不选则为全部类型',
+    note: '仅影响统计口径，不影响记录：未选中的类型仍可正常记录。',
+    toastOf: (ids) => (ids.length ? `统计页只统计 ${mainSummary()}` : '统计页已恢复为全部类型'),
+  },
+  focus: {
+    key: 'focusIds',
+    title: '周热力图范围',
+    desc: '仅周热力图按此范围统计',
+    sub: '仅周热力图按此范围统计；不选则为全部类型',
+    note: '仅影响周热力图的统计范围；未选中的类型仍可正常记录。',
+    toastOf: (ids) => (ids.length ? `周热力图只统计 ${focusSummary()}` : '周热力图统计全部类型'),
+  },
+};
+
+/* 「统计设置」：两组范围各一行，点进去就是勾选抽屉。
+   统计页以后的开关都往这里放，别往页面上堆按钮。 */
+function openStatsSettings() {
+  const body = `<div class="list glass">
+    ${Object.entries(SCOPE_UI).map(([kind, cfg]) => `<button class="li" data-pick="${kind}">
+      <span class="tt">${cfg.title}<small>${cfg.desc}</small></span>
+      <span class="vv" style="max-width:52%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(kind === 'main' ? mainSummary() : focusSummary())}<svg class="ic chev"><use href="#i-chevron"/></svg></span>
+    </button>`).join('')}
+  </div>
+  <div class="muted" style="margin-top:14px;font-size:12px;line-height:1.6">
+    以上范围仅决定统计页的统计口径，不影响记录本身。
+  </div>`;
+
+  openSheet({
+    title: '统计设置',
+    sub: '仅影响统计页的统计口径',
+    body,
+    foot: '<button class="btn primary" data-do="close">完成</button>',
+    onMount(sheet, { close }) {
+      /* 改完范围回来，把这一行的值刷新一下（抽屉不关，用户可能接着改另一项） */
+      const refresh = () => {
+        const vals = { main: mainSummary(), focus: focusSummary() };
+        sheet.querySelectorAll('[data-pick]').forEach((el) => {
+          const v = el.querySelector('.vv');
+          if (v && v.firstChild) v.firstChild.nodeValue = vals[el.dataset.pick];
+        });
+      };
+      sheet.addEventListener('click', (e) => {
+        const pick = e.target.closest('[data-pick]');
+        if (pick) {
+          const cfg = SCOPE_UI[pick.dataset.pick];
+          if (cfg) openScopeSheet({ ...cfg, onDone: refresh });
+          return;
+        }
+        const b = e.target.closest('[data-do]');
+        if (b && b.dataset.do === 'close') close();
+      });
+    },
+  });
+}
+
 export function mount(root) {
   root.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'stats-set') {
+      openStatsSettings();
+      return;
+    }
     const yn = e.target.closest('[data-year]');
     if (yn) {
       if (yn.disabled) return;
@@ -664,14 +879,26 @@ export function tick() {
   if (now < from || now > to) return;
 
   const cur = agg(from, to, now);
+  const scoped = mainSet() !== null;
   const sum = root.querySelector('.h-sub');
   if (sum) {
-    const prev = agg(from - (to - from), from, now);
+    /* 「比上期」：年看的话要跟去年同一天起算，不能简单减 365 天（闰年会差一天） */
+    let prevFrom = from - (to - from);
+    if (range === 'year') {
+      const d = new Date(from);
+      d.setFullYear(d.getFullYear() - 1);
+      prevFrom = d.getTime();
+    }
+    const prev = agg(prevFrom, from, now);
     const pct = prev.total > 0 ? ((cur.total - prev.total) / prev.total) * 100 : null;
     const peak = peakHour(cur.byHour);
-    sum.textContent = `${rangeLabel(from)} · 共 ${fmtDur(cur.total)}`
-      + (pct === null ? '' : ` · 比上期 ${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%`)
-      + (cur.total && peak ? ` · 最投入 ${peak.h}–${peak.h + 1} 点` : '');
+    sum.innerHTML = subLine([
+      rangeLabel(from),
+      scoped ? `只看 ${esc(mainSummary())}` : '',
+      `共 ${fmtDur(cur.total)}`,
+      pct === null ? '' : `比上期 ${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%`,
+      cur.total && peak ? `最投入 ${peak.h}–${peak.h + 1} 点` : '',
+    ]);
   }
 
   /* 只认主图那个中心数字：24 小时那块也有 .donut-c，别被这里改掉 */
@@ -682,8 +909,12 @@ export function tick() {
   if (kpis.length === 4) {
     const span = Math.max(1, Math.min(to, now) - from);
     const days = Math.max(1, Math.round(span / DAY) || 1);
-    kpis[0].textContent = fmtDur(cur.total / days);
+    const put = (el, s) => { el.textContent = s; el.classList.toggle('sm', s.length >= 7); };
+    put(kpis[0], fmtDur(cur.total / days));
     kpis[1].textContent = String(cur.count);
-    kpis[3].textContent = fmtDur(Math.max(0, span - cur.total));
+    put(kpis[3], fmtDur(Math.max(0, span - cur.total)));
   }
+
+  /* 图外的时长标签不跟着秒针重排：它们按 y 排过序，逐条改数字会让指引线对不上，
+     下次重画（切范围、切画法、别的写操作）时自然就新了 */
 }

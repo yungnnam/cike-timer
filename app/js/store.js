@@ -13,8 +13,11 @@ export const DEFAULT_SETTINGS = {
   fx: 'solid',      // 只有 pure solid 一种界面：不透明底 + 细线，无毛玻璃、无光晕
   haptics: true,    // 点按时轻微震动
   undoMs: 5000,     // 撤销提示条停留多久（毫秒）：3 / 5 / 8 / 10 秒可选
-  focusIds: [],     // 统计只看这些分组/类型（空 = 全部）；选中分组时子类型自动算进来
-  tipDone: false,   // 「三件事就够用了」那张提示卡关掉了没有
+  focusIds: [],     // 周热力图只看这些分组/类型（空 = 全部）；选中分组时子类型自动算进来
+  mainIds: [],      // 主要显示范围：统计页除周热力图以外的卡片都按它算（空 = 全部）
+  profileName: '',  // 本地账号的名字（空 = 还没起名，卡片上显示「设置名字」）
+  profileAvatar: '', // 本地账号头像：一个 emoji，或 128×128 的 data URL（空 = 名字首字）
+  tipDone: false,   // 「使用说明」那张提示卡关掉了没有
   dayStart: 0,      // 一天的起点（0-6 点）
   weekStart: 1,     // 1 = 周一
   minDur: 0,        // 短于 N 秒的记录自动丢弃，0 = 不丢弃
@@ -181,19 +184,23 @@ export function typePath(id) {
   return p ? `${p.name} / ${t.name}` : t.name;
 }
 
-/* ---------------- 关注范围 ----------------
-   统计页的「周热力图」只算用户挑出来的分组和类型。
-   存的是 id 数组：选分组就是整个分组（子类型自动展开），选子类型就只算它。
+/* ---------------- 统计范围 ----------------
+   统计页有两组范围，各管各的：
+     · mainIds  —— 主要显示范围：占比、分布、一周节奏、排行均按此范围统计
+     · focusIds —— 周热力图范围：仅周热力图按此范围统计
+   两组的存法一样：id 数组。选分组就是整个分组（子类型自动展开），选子类型就只算它；
    空数组 = 不筛选，全部类型。 */
-export function focusIds() {
-  const raw = Array.isArray(state.settings.focusIds) ? state.settings.focusIds : [];
+function scopeIdsOf(key) {
+  const raw = Array.isArray(state.settings[key]) ? state.settings[key] : [];
   // 类型删掉之后设置里可能留着死 id，读的时候顺手滤掉
   return raw.filter((id) => !!typeById(id));
 }
 
+export const scopeIds = (key) => scopeIdsOf(key);
+
 /** 展开成一组具体类型 id；没设过返回 null（= 全部） */
-export function focusSet() {
-  const ids = focusIds();
+export function scopeSet(key) {
+  const ids = scopeIdsOf(key);
   if (!ids.length) return null;
   const set = new Set();
   for (const id of ids) {
@@ -204,11 +211,18 @@ export function focusSet() {
 }
 
 /** 一句说明：「全部类型」/「学习、编程」/「学习、编程 等 4 项」 */
-export function focusSummary() {
-  const names = focusIds().map((id) => typeById(id)?.name || '').filter(Boolean);
+export function scopeSummary(key) {
+  const names = scopeIdsOf(key).map((id) => typeById(id)?.name || '').filter(Boolean);
   if (!names.length) return '全部类型';
   return names.length <= 2 ? names.join('、') : `${names.slice(0, 2).join('、')} 等 ${names.length} 项`;
 }
+
+export const focusIds = () => scopeIdsOf('focusIds');
+export const focusSet = () => scopeSet('focusIds');
+export const focusSummary = () => scopeSummary('focusIds');
+export const mainIds = () => scopeIdsOf('mainIds');
+export const mainSet = () => scopeSet('mainIds');
+export const mainSummary = () => scopeSummary('mainIds');
 
 /* 按顶级类型汇总（分组合并子类型），统计页环形图和排行用 */
 export function sumByTop(from, to, now = Date.now()) {
@@ -832,6 +846,14 @@ export async function importBundle(obj) {
     // 备份里的关注范围可能指向这份文件里没有的类型，落地前先滤一遍
     const have = new Set(state.types.map((t) => t.id));
     state.settings.focusIds = (Array.isArray(state.settings.focusIds) ? state.settings.focusIds : []).filter((id) => have.has(id));
+    // 名字和头像也来自备份文件，收窄一下：名字最多 24 字；
+    // 头像只收「一个 emoji」或「压缩过的 data URL」，别的（外链、超长串）一律不用
+    const rawName = state.settings.profileName;
+    state.settings.profileName = typeof rawName === 'string' ? rawName.trim().slice(0, 24) : '';
+    const rawAv = state.settings.profileAvatar;
+    const emoji = typeof rawAv === 'string' && rawAv.length > 0 && rawAv.length <= 16 && !rawAv.startsWith('data:');
+    const photo = typeof rawAv === 'string' && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(rawAv) && rawAv.length < 400000;
+    state.settings.profileAvatar = emoji || photo ? rawAv : '';
   }
   await persistAll();
   emit();

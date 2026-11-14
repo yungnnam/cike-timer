@@ -33,7 +33,7 @@ export function openTypeEditor(type, opts = {}) {
         </span>
         <button class="toggle ${isGroup ? 'on' : ''}" data-tg="group" ${hasKids ? 'disabled' : ''}></button>
       </div>
-      ${hasKids ? '<div class="hint">里面已经有子类型了，所以一直是分组。</div>' : ''}
+      ${hasKids ? '<div class="hint">该类型下已有子类型，因此保持为分组。</div>' : ''}
     </div>
     <div class="field" data-wrap-parent ${isGroup ? 'hidden' : ''}><label>归到分组（可选）</label>
       <select class="inp" data-k="parent">
@@ -41,9 +41,9 @@ export function openTypeEditor(type, opts = {}) {
         ${parents.map((p) => `<option value="${p.id}" ${p.id === parentId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
       </select>
     </div>
-    <div class="field" data-quick-field hidden><label>先用分组色的深浅</label>
+    <div class="field" data-quick-field hidden><label>沿用分组色深浅</label>
       <div class="swatches quick" data-quick></div>
-      <div class="hint">同一分组里想分得开，挑不同深浅最省事；统计图里也会把它们画成同一个色系。</div>
+      <div class="hint">同一分组内可用不同深浅区分，统计图中保持同一色系。</div>
     </div>
     <div class="field"><label>颜色</label>
       <div class="swatches" data-colors>
@@ -72,7 +72,7 @@ export function openTypeEditor(type, opts = {}) {
 
   openSheet({
     title: isNew ? (isGroup ? '新建分组' : '新建类型') : '编辑类型',
-    sub: '颜色会用来发光；分组只是容器，也能直接记录',
+    sub: '颜色用于发光显示；分组作为容器，也可直接记录',
     body, foot,
     onMount(sheet, { close }) {
       const saveBtn = $('[data-do="save"]', sheet);
@@ -102,8 +102,8 @@ export function openTypeEditor(type, opts = {}) {
         const shade = p ? [0, 1, 2, 3, 4].find((k) => shadeFor(p.color, k).toLowerCase() === String(color).toLowerCase()) : undefined;
         if (same) hintEl.textContent = `跟分组「${p.name}」同一个颜色`;
         else if (shade) hintEl.textContent = `和「${p.name}」同色系的第 ${shade + 1} 档，统计里能分开`;
-        else if (hasKids) hintEl.textContent = '改色时下面的子类型会一起换；关掉开关就让它们各自保留';
-        else hintEl.textContent = '一个分组一种颜色，子类型默认跟着分组走';
+        else if (hasKids) hintEl.textContent = '修改颜色时子类型同步变化；关闭后各自保留';
+        else hintEl.textContent = '每个分组一种颜色，子类型默认沿用分组颜色';
       };
       paintHint();
       paintQuick();
@@ -164,7 +164,7 @@ export function openTypeEditor(type, opts = {}) {
 
         if (b.dataset.do === 'save') {
           const name = $('[data-k="name"]', sheet).value.trim();
-          if (!name) { toast('给它起个名字'); return; }
+          if (!name) { toast('给它设置名字'); return; }
           const pid = isGroup ? null : ($('[data-k="parent"]', sheet)?.value || null);
           const patch = { name, icon, color, parentId: pid, isGroup };
           if (isNew) {
@@ -270,7 +270,7 @@ export function openGoalEditor(goal) {
         if (b.dataset.do === 'save') {
           const name = $('[data-k="name"]', sheet).value.trim();
           const hours = parseFloat(hoursEl.value) || 0;
-          if (!name) { toast('给目标起个名字'); return; }
+          if (!name) { toast('给目标设置名字'); return; }
           if (hours <= 0) { toast('目标时长要大于 0'); return; }
           const patch = { name, period, mode, typeIds: Array.from(typeIds), targetMin: Math.round(hours * 60) };
           if (isNew) { addGoal(patch); close(); toast('目标已创建', { undoable: true }); }

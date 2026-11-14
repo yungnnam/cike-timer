@@ -5,6 +5,55 @@ All notable changes to 此刻 / Cike.
 The build stamp shown under *Me → About → Build* (`cike-vNN`) identifies the asset bundle and
 changes on every build, independently of the semantic version.
 
+## v1.2.6 — 2026-11-14
+
+- **Added**: a local profile at the top of the Me page — a name (up to 24 characters) and an
+  avatar picked from eleven emoji or from the photo library (photos are cropped to 128×128 and
+  kept on the device). The profile lives in settings (`profileName`, `profileAvatar`), so it
+  travels inside the JSON backup; importing a backup trims the name and rejects anything that
+  is not a short emoji or a png/jpeg/webp data URL under 400 KB.
+- **Added**: a **Yesterday** range on the Stats page (Today / Yesterday / This week / This
+  month / This year). It covers one full natural day — respecting the "day starts at" setting —
+  with an hour-by-hour breakdown and an "11 月 13 日 0:00 – 24:00" footnote, so yesterday can be
+  compared with today without leaving the page.
+- **Changed**: the ranking list only shows a change when it is at least one minute. Yesterday
+  and the day before are usually almost identical, and four rows of "↑0分" were just noise.
+- **Changed**: every interface string was rewritten in a formal, factual tone — the same
+  meaning with fewer conversational turns of phrase (e.g. the profile subtitle is now
+  "仅保存在本机；更换设备前导出备份即可迁移").
+- **Fixed**: three-part KPIs such as "135小时27分" were clipped by an ellipsis in the
+  four-column grid; they now drop one font size instead. Slices under a minute no longer get
+  a leader label reading "0分".
+- **Internal**: the main browser suite now also covers the profile card and the Yesterday range
+  (48 checks); `tools/shotprofile.mjs` captures the card, the sheet and the new range for
+  visual review.
+
+## v1.2.5 — 2026-11-14
+
+- **Added**: a settings sheet behind the gear button on the Stats page. It holds both scope
+  pickers: **Main range** (`mainIds`) now drives shares, breakdown, weekly rhythm and the
+  ranking list; **Heatmap range** (`focusIds`) keeps driving only the 12-week heat map.
+  Ranges decide what the page counts, never what can be recorded, so unselected types can
+  still be recorded.
+- **Added**: duration callouts around the pie and ring chart — each slice's time is drawn
+  outside the chart on a leader line, so small slices no longer have to fit their duration
+  inside the sector. Names and shares stay inside the slices; a single-type chart writes
+  name, 100% and total in the centre instead.
+- **Changed**: the ranking card moved below the weekly heat map; the heat map and the goals
+  card render even when the current range has no entries; the page subtitle names the active
+  scope; both scope pickers share one selection sheet (`app/js/scopesheet.js`). The scope row
+  on the Me page is gone — the gear on the Stats page is now the single entry point.
+- **Fixed**: the ring centre value overrunning the ring hole on narrow screens; the four KPIs
+  collapsing into one-character columns below 380 px (now 2×2); scope names printed into the
+  subtitle without escaping; the subtitle's separators wrapping onto the wrong line; tapping an
+  empty spot on the ink band opening the backfill sheet and immediately closing it again (the
+  click that ends the tap landed on the new backdrop — sheets now ignore backdrop clicks for
+  the first 300 ms after opening).
+- **Internal**: chart tests now read slice fills and leader labels instead of the removed side
+  list; the suite covers the two independent scopes and the settings sheet; a new
+  `tools/backfilltest.mjs` covers the backfill flow end to end (drag, snapping, overlap
+  trimming, rejection past "now", midnight clamping, undo, persistence).
+
 ## v1.2.4 — 2026-11-13
 
 - **Added**: *Stats scope* under *Me* — pick any number of groups and types; selecting a group

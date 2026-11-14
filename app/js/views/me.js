@@ -4,7 +4,6 @@ import {
   state, typeById, liveTypes, elapsed, saveSettings, exportBundle, importBundle,
   wipeAll, goalProgress, totalMs, seedDemo,
   topTypes, childTypes, groupList, isGroup, followLangNames,
-  focusIds, focusSummary,
 } from '../store.js';
 import { fmtDur, fmtISO, hexA } from '../format.js';
 import { openTypeEditor, openGoalEditor } from '../editors.js';
@@ -17,6 +16,54 @@ const THEMES = [['dark', '深色'], ['light', '浅色'], ['auto', '跟随系统'
 const LANGS = [['zh', '中文'], ['en', 'English'], ['auto', '跟随系统']];
 // 撤销条停留多久（毫秒 → 显示文案）
 const UNDO_CHOICES = [[3000, '3 秒'], [5000, '5 秒'], [8000, '8 秒'], [10000, '10 秒']];
+// 头像候选：11 个表情 + 1 个「相册」，正好铺满两行六列
+const AVATARS = ['🌱', '☕', '📚', '💻', '🎧', '🏃', '🌙', '🍀', '🔥', '🎯', '🐱'];
+
+/** 名字 → 一个稳定的色相，没设头像时用首字配这个颜色，比默认灰好认 */
+function hueOf(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+  return h;
+}
+
+/** 头像有四种来源，优先级：相片 → 表情 → 名字首字 → 人像图标 */
+function avatarHtml() {
+  const av = state.settings.profileAvatar || '';
+  const name = (state.settings.profileName || '').trim();
+  if (av.startsWith('data:')) return `<span class="acct-av"><img src="${av}" alt=""></span>`;
+  if (av) return `<span class="acct-av emo">${av}</span>`;
+  if (name) return `<span class="acct-av txt" style="--c:hsl(${hueOf(name)} 62% 52%)">${esc(name.slice(0, 1))}</span>`;
+  return `<span class="acct-av"><svg class="ic"><use href="#i-me"/></svg></span>`;
+}
+
+/** 缩成 128×128 的方形照片，存成 JPEG 的 data URL（一张大约 6–9 KB，备份也带得动） */
+function toAvatar(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const S = 128;
+        const cv = document.createElement('canvas');
+        cv.width = S;
+        cv.height = S;
+        const g = cv.getContext('2d');
+        // cover：短边撑满，长边居中裁掉，不拉伸人脸
+        const k = Math.max(S / img.width, S / img.height);
+        const w = img.width * k;
+        const h = img.height * k;
+        g.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
+        URL.revokeObjectURL(url);
+        resolve(cv.toDataURL('image/jpeg', 0.86));
+      } catch (e) {
+        URL.revokeObjectURL(url);
+        reject(e);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读取失败')); };
+    img.src = url;
+  });
+}
 
 /** 这台机器到底能不能震：APK 里走原生桥，浏览器看有没有振动 API */
 function hasHaptics() {
@@ -34,7 +81,7 @@ function hasHaptics() {
  * 状态分三种说法，因为「看不到通知」有三种完全不同的原因：
  *   1. 通知权限被拒（系统级）→ 去系统设置里打开，或再问一次
  *   2. 通知渠道被关（本条 App 的通知被静音）→ 同上
- *   3. 还没开始过一次计时 → 渠道还没建出来，属正常
+ *   3. 尚未开始一次计时 → 渠道还没建出来，属正常
  */
 function notifySection() {
   if (!hasNotify()) return '';
@@ -43,13 +90,13 @@ function notifySection() {
   let hint = '正在计时的活动会挂在通知栏和锁屏上';
   if (st && st.enabled === false) {
     vv = '被关掉了';
-    hint = '点这里去系统设置里允许通知，锁屏才看得到';
+    hint = '前往系统设置允许通知，锁屏即可显示';
   } else if (st && st.channel === false) {
-    vv = '还没开始过';
-    hint = '第一次开始计时后，通知和锁屏上就会有了';
+    vv = '尚未开始';
+    hint = '开始计时后，通知栏与锁屏将显示';
   } else if (st && st.importance === 0) {
     vv = '被静音了';
-    hint = '这条通知在系统里被关掉了，点这里去打开';
+    hint = '通知已在系统中关闭，点击前往开启';
   }
   return `<div class="sec-t">通知</div>
   <div class="list glass">
@@ -81,10 +128,19 @@ export function render() {
     </div>
   </div>
 
+  <button class="acct" data-act="profile">
+    ${avatarHtml()}
+    <span class="acct-meta">
+      <span class="acct-n ${(state.settings.profileName || '').trim() ? '' : 'empty'}">${esc((state.settings.profileName || '').trim() || '设置名字')}</span>
+      <span class="acct-s">本地账号 · 名称与头像随备份一起导出</span>
+    </span>
+    <svg class="ic chev"><use href="#i-chevron"/></svg>
+  </button>
+
   <div class="sec-t">类型${groupList().length ? ` · ${groupList().length} 个分组` : ''}</div>
   <div class="list glass">
     ${groupList().length ? '' : `<div class="li" style="display:block;color:var(--text-3);font-size:12.5px;line-height:1.65">
-      还没有分组。分组是个容器，比如「学习」里放编程、英语、高数，统计和目标会把这些子类型合并起来算。
+      还没有分组。分组用于归类子类型，统计与目标会合并计算。
     </div>`}
     ${topTypes().map((t) => {
       const kids = childTypes(t.id);
@@ -118,15 +174,6 @@ export function render() {
     </button>
   </div>
 
-  <div class="sec-t">统计范围</div>
-  <div class="list glass">
-    <button class="li" data-act="focus">
-      <span class="dot" style="--c:var(--accent);background:transparent;border:1.5px solid color-mix(in srgb, var(--accent) 65%, transparent)"></span>
-      <span class="tt">关注的分组与类型<small>周热力图只算选中的这些；不选就是全部</small></span>
-      <span class="vv" style="max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(focusSummary())}<svg class="ic chev"><use href="#i-chevron"/></svg></span>
-    </button>
-  </div>
-
   <div class="sec-t">目标</div>
   <div class="list glass">
     ${state.goals.length ? state.goals.map((g) => {
@@ -137,7 +184,7 @@ export function render() {
         <span class="tt">${esc(g.name)}<small>${label}${g.mode === 'reach' ? '至少' : '最多'} ${Math.round(g.targetMin / 60 * 10) / 10} 小时 · 现在 ${fmtDur(p.cur)}</small></span>
         <span class="vv">${Math.round(Math.min(1, p.cur / p.target) * 100)}%<svg class="ic chev"><use href="#i-chevron"/></svg></span>
       </button>`;
-    }).join('') : `<div class="li" style="color:var(--text-3);font-size:13px">还没有目标。定一个，统计页会帮你盯着。</div>`}
+    }).join('') : `<div class="li" style="color:var(--text-3);font-size:13px">还没有目标。新建目标后，统计页会跟踪进度。</div>`}
     <button class="li" data-act="new-goal">
       <span class="dot" style="--c:var(--text-3);background:transparent;border:1px dashed var(--text-3);box-shadow:none"></span>
       <span class="tt" style="color:var(--text-2)">新建目标</span>
@@ -155,7 +202,7 @@ export function render() {
     </div>
     <div class="li" style="display:block">
       <div style="margin-bottom:9px;font-size:14.5px">语言
-        <small style="display:block;color:var(--text-3);font-size:12px;margin-top:3px">界面文字换成英文；类型名和备注是你自己的数据，不会被翻译</small>
+        <small style="display:block;color:var(--text-3);font-size:12px;margin-top:3px">界面文字切换为英文；类型名与备注属于本地数据，不会被翻译</small>
       </div>
       <div class="seg-ctrl" data-lang-pick>
         ${LANGS.map(([v, l]) => `<button class="${langNow === v ? 'on' : ''}" data-v="${v}">${l}</button>`).join('')}
@@ -166,16 +213,16 @@ export function render() {
       <span class="vv">${state.settings.motion === 'off' ? '已关闭' : '开启'}</span>
     </button>
     ${hasHaptics() ? `<button class="li" data-act="haptics">
-      <span class="tt">点按震动<small>按下去手机会轻轻一震，反馈更实在</small></span>
+      <span class="tt">点按震动<small>按下时给出轻微震动反馈</small></span>
       <span class="vv">${state.settings.haptics === false ? '已关闭' : '开启'}</span>
     </button>` : ''}
     <button class="li" data-act="day-start">
-      <span class="tt">一天从几点开始<small>熬夜记的时间算到哪一天</small></span>
+      <span class="tt">一天从几点开始<small>凌晨记录归属的日期分界</small></span>
       <span class="vv">${String(state.settings.dayStart || 0).padStart(2, '0')}:00</span>
     </button>
     <div class="li" style="display:block">
       <div style="margin-bottom:9px;font-size:14.5px">撤销提示停留
-        <small style="display:block;color:var(--text-3);font-size:12px;margin-top:3px">改完／删完之后，那条「撤销」留多久</small>
+        <small style="display:block;color:var(--text-3);font-size:12px;margin-top:3px">修改或删除后，「撤销」提示的停留时长</small>
       </div>
       <div class="seg-ctrl" data-undo-pick>
         ${UNDO_CHOICES.map(([v, l]) => `<button class="${undoNow === v ? 'on' : ''}" data-v="${v}">${l}</button>`).join('')}
@@ -187,11 +234,11 @@ export function render() {
   <div class="sec-t">数据</div>
   <div class="list glass">
     <button class="li" data-act="export-json">
-      <span class="tt">导出备份<small>JSON，可再导入回来</small></span>
+      <span class="tt">导出备份<small>JSON 格式，可重新导入</small></span>
       <span class="vv"><svg class="ic sm"><use href="#i-download"/></svg></span>
     </button>
     <button class="li" data-act="export-csv">
-      <span class="tt">导出 CSV<small>给表格软件看</small></span>
+      <span class="tt">导出 CSV<small>可用表格软件打开</small></span>
       <span class="vv"><svg class="ic sm"><use href="#i-download"/></svg></span>
     </button>
     <button class="li" data-act="import">
@@ -199,7 +246,7 @@ export function render() {
       <span class="vv"><svg class="ic sm"><use href="#i-upload"/></svg></span>
     </button>
     <button class="li" data-act="demo">
-      <span class="tt">载入示例数据<small>一周虚构记录 + 两个目标，用来先看看界面</small></span>
+      <span class="tt">载入示例数据<small>一周示例记录与两个目标，用于预览界面</small></span>
       <span class="vv"><svg class="ic sm"><use href="#i-bolt"/></svg></span>
     </button>
     <button class="li" data-act="wipe">
@@ -211,11 +258,11 @@ export function render() {
   <div class="sec-t">关于</div>
   <div class="list glass">
     <div class="li">
-      <span class="tt">此刻 <small>v1.2.4 正式版</small></span>
-      <span class="vv">构建 cike-v41</span>
+      <span class="tt">此刻 <small>v1.2.6 正式版</small></span>
+      <span class="vv">构建 cike-v43</span>
     </div>
     <div class="li" style="display:block;color:var(--text-3);font-size:12.5px;line-height:1.7">
-      所有数据只存在这台设备上，不上传、不需要账号。加到主屏幕后跟普通 App 一样用；装成 APK 时数据在应用自己的目录里，卸载会一起删掉，换机前记得先导一份备份。
+      所有数据只存在这台设备上，不上传、也不用注册。上面的名字和头像只是给自己看的，会跟着备份一起导出。加到主屏幕后跟普通 App 一样用；装成 APK 时数据在应用自己的目录里，卸载会一起删掉，换机前记得先导一份备份。
     </div>
   </div>
   <div class="spacer-16"></div>`;
@@ -263,6 +310,7 @@ export function mount(root) {
     if (!act) return;
 
     if (act === 'new-type') openTypeEditor(null);
+    if (act === 'profile') openProfileSheet();
     if (act === 'new-group') openTypeEditor(null, { isGroup: true });
     if (act === 'new-goal') openGoalEditor(null);
     if (act === 'motion') {
@@ -278,7 +326,6 @@ export function mount(root) {
       toast(state.settings.haptics === false ? '点按震动已关闭' : '点按震动已开启');
     }
     if (act === 'day-start') openDayStartSheet();
-    if (act === 'focus') openFocusSheet();
     if (act === 'notify-settings') {
       // 先去系统设置页看一眼；如果通知权限本身还没给，顺手再问一次
       const st = notifyStatus();
@@ -294,7 +341,7 @@ export function mount(root) {
     if (act === 'import') importFile();
     if (act === 'demo') {
       const done = await seedDemo();
-      toast(done ? '示例数据已载入，随便点开看看' : '已经有记录了，示例数据不会覆盖你的数据');
+      toast(done ? '示例数据已载入' : '已有记录，示例数据不会覆盖现有数据');
     }
     if (act === 'wipe') {
       if (!window.confirm('清空所有记录和目标？类型会保留，清空后 5 秒内可以撤销。')) return;
@@ -305,80 +352,77 @@ export function mount(root) {
 }
 
 /**
- * 关注范围：统计页的周热力图只算这里勾上的分组/类型。
- * 勾分组 = 整组（子类型自动算进来，子项显示成「随分组」不可单独取消）；
- * 不勾分组时，子类型可以一个个挑 —— 只想看「英语」不想要「编程」也能做到。
+ * 本地账号：名字 + 头像，都存在 settings 里，跟着备份走。
+ * 抽屉里的改动先攒着，点「保存」才落地 —— 中途关掉就当没改过。
  */
-function openFocusSheet() {
-  const picked = new Set(focusIds());
+function openProfileSheet() {
+  const startName = state.settings.profileName || '';
+  const startAv = state.settings.profileAvatar || '';
+  let picked = startAv;
 
-  const row = (t, kid, derived) => {
-    const on = derived || picked.has(t.id);
-    return `<button class="f-row${kid ? ' kid' : ''}${on ? ' on' : ''}${derived ? ' derived' : ''}" data-fid="${t.id}">
-      <span class="fc"></span>
-      <span class="dot" style="--c:${t.color};background:${t.color}"></span>
-      <span class="tt">${esc(t.name)}${!kid && isGroup(t) ? `<small>整个分组 · ${childTypes(t.id).length} 个子类型</small>` : (kid ? '<small>只算它自己</small>' : '')}</span>
-    </button>`;
-  };
-
-  const list = () => topTypes().map((t) => {
-    if (!isGroup(t)) return row(t, false, false);
-    const derived = picked.has(t.id);
-    return row(t, false, false) + childTypes(t.id).map((k) => row(k, true, derived)).join('');
-  }).join('');
-
-  const body = `<div class="f-list" data-flist>${list()}</div>
-    <div class="muted" style="margin-top:14px;font-size:12px;line-height:1.6">
-      这里是「看什么」，不是「记什么」：没选中的类型照样可以记，只是不画进周热力图。
-    </div>`;
+  const grid = () => AVATARS.map((a) => `<button class="av-pick ${picked === a ? 'on' : ''}" data-av="${a}">${a}</button>`).join('')
+    + `<button class="av-pick photo ${picked.startsWith('data:') ? 'on' : ''}" data-do="photo" aria-label="从相册选一张">
+        ${picked.startsWith('data:') ? `<img src="${picked}" alt="">` : '<svg class="ic"><use href="#i-upload"/></svg>'}
+      </button>`;
 
   openSheet({
-    title: '关注的分组与类型',
-    sub: '统计页的周热力图只算这些；一个都不选就是全部',
-    body,
-    foot: '<button class="btn" data-do="clear">全部类型</button><button class="btn primary" data-do="save">保存</button>',
+    title: '本地账号',
+    sub: '仅保存在本机；更换设备前导出备份即可迁移',
+    // 拼成一串短字符串而不是一整段模板：文案体检（i18ncover）是按引号切片的，
+    // 超过 120 字的长模板会被它切碎，拆短了才看得清哪些字要翻译。
+    body: '<div class="field"><label>名字</label>'
+      + `<input class="inp" data-k="name" maxlength="24" value="${esc(startName)}" placeholder="输入名称" autocomplete="off"></div>`
+      + '<div class="field" style="margin-top:16px"><label>头像</label>'
+      + `<div class="av-grid" data-av-grid>${grid()}</div>`
+      + '<div class="hint">可从内置图标或相册选择头像；图片会压缩为 128×128 保存在本机。</div></div>'
+      + '<input type="file" accept="image/*" data-k="file" hidden>',
+    foot: `<button class="btn" data-do="clear">清除头像</button><button class="btn primary" data-do="save">保存</button>`,
     onMount(sheet, { close }) {
-      const box = sheet.querySelector('[data-flist]');
-      const repaint = () => { box.innerHTML = list(); };
+      const nameEl = sheet.querySelector('[data-k="name"]');
+      const fileEl = sheet.querySelector('[data-k="file"]');
+      const gridEl = sheet.querySelector('[data-av-grid]');
+      const repaint = () => { gridEl.innerHTML = grid(); };
+
+      fileEl.addEventListener('change', async () => {
+        const file = fileEl.files?.[0];
+        if (!file) return;
+        try {
+          picked = await toAvatar(file);
+          repaint();
+        } catch (err) {
+          toast(err?.message || '图片读取失败');
+        } finally {
+          fileEl.value = '';
+        }
+      });
 
       sheet.addEventListener('click', async (e) => {
-        const r = e.target.closest('.f-row');
-        if (r && !r.classList.contains('derived')) {
-          const id = r.dataset.fid;
-          if (picked.has(id)) picked.delete(id);
-          else {
-            picked.add(id);
-            // 勾了整个分组，再单独勾子类型就重复了，去掉
-            if (isGroup(typeById(id))) descendantsOf(id).forEach((k) => picked.delete(k));
-          }
-          repaint();
-          return;
-        }
+        const av = e.target.closest('[data-av]');
+        if (av) { picked = av.dataset.av; repaint(); return; }
         const b = e.target.closest('[data-do]');
         if (!b) return;
-        if (b.dataset.do === 'clear') { picked.clear(); repaint(); return; }
-        if (b.dataset.do === 'save') {
-          await saveSettings({ focusIds: Array.from(picked) });
+        const what = b.dataset.do;
+        if (what === 'photo') { fileEl.click(); return; }
+        if (what === 'clear') { picked = ''; repaint(); return; }
+        if (what === 'save') {
+          await saveSettings({
+            profileName: String(nameEl.value || '').trim().slice(0, 24),
+            profileAvatar: picked,
+          });
           close();
           window.__app.render();
-          const src = focusIds();
-          toast(src.length ? `周热力图只统计 ${focusSummary()}` : '周热力图统计全部类型');
+          toast('账号信息已保存');
         }
       });
     },
   });
 }
 
-/** 分组下所有层级的子类型 id（含孙子），只给上面的选择器用 */
-function descendantsOf(id) {
-  return childTypes(id).flatMap((k) => [k.id, ...descendantsOf(k.id)]);
-}
-
 function openDayStartSheet() {
   const cur = state.settings.dayStart || 0;
   openSheet({
     title: '一天从几点开始',
-    sub: '如果你常在凌晨活动，把一天的起点设到 4 点，凌晨 1 点的记录就还算「昨天」。',
+    sub: '若常在凌晨活动，可将一天的起点设为 4 点，凌晨 1 点的记录仍计入前一天。',
     body: `<div class="seg-ctrl" data-ds>${[0, 2, 3, 4, 5, 6].map((h) => `<button class="${h === cur ? 'on' : ''}" data-v="${h}">${h} 点</button>`).join('')}</div>`,
     onMount(sheet, { close }) {
       sheet.addEventListener('click', async (e) => {
@@ -458,7 +502,7 @@ function importFile() {
       await importBundle(obj);
       toast(`导入完成：${n} 条记录`, { undoable: true });
     } catch (err) {
-      toast('导入失败：' + (err?.message || '文件读不出来'));
+      toast('导入失败：' + (err?.message || '文件读取失败'));
     } finally {
       cleanup();
     }

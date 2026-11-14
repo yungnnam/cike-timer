@@ -79,7 +79,7 @@ export function render() {
 
 function listHtml(list, now) {
   if (!list.length) {
-    return `<div class="empty">${query ? '没搜到，换个词试试' : '这段时间还没有记录<br>回到「此刻」点一下类型就开始'}</div>`;
+    return `<div class="empty">${query ? '没有匹配结果，请更换关键词' : '这段时间还没有记录<br>回到「此刻」点击类型即可开始'}</div>`;
   }
   const groups = new Map();
   for (const c of list) {

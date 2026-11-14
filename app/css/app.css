@@ -155,6 +155,10 @@ html[data-theme="light"] .tip-x:active { background: rgba(0, 0, 0, .06); }
 .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 2px 2px 16px; }
 .h-title { font-size: 23px; font-weight: 650; letter-spacing: -.02em; margin: 0; line-height: 1.2; }
 .h-sub { font-size: 12.5px; color: var(--text-3); margin-top: 4px; font-variant-numeric: tabular-nums; }
+/* 副标题按「段」换行：一段里的「最投入 10–11 点」不许拆开。
+   段与段之间的「·」由这里画 —— 文字里不带分隔符，英文替换才不会错位。 */
+.h-sub .s { display: inline-block; white-space: nowrap; }
+.h-sub .s + .s::before { content: '·'; margin: 0 .42em; opacity: .8; }
 .h-act { display: flex; gap: 8px; flex: none; }
 
 .icon-btn {
@@ -364,6 +368,44 @@ html[data-theme="light"] .chip.on { background: #fff; }
 .li .vv { font-size: 13px; color: var(--text-3); flex: none; display: flex; align-items: center; gap: 6px; }
 .li .chev { width: 16px; height: 16px; opacity: .35; }
 .sec-t { font-size: 12px; color: var(--text-3); letter-spacing: .06em; margin: 22px 4px 8px; text-transform: uppercase; }
+
+/* 本地账号：我的页最上面那张卡，不是列表行，所以单独一套样式 */
+.acct {
+  display: flex; align-items: center; gap: 14px;
+  width: 100%; text-align: left; margin-top: 16px;
+  padding: 14px 16px; border-radius: 22px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  transition: background .16s;
+}
+.acct:active { background: rgba(255, 255, 255, .05); }
+.acct-av {
+  flex: none; width: 54px; height: 54px; border-radius: 50%; overflow: hidden;
+  display: grid; place-items: center; line-height: 1;
+  background: var(--glass-bg); border: 1px solid var(--line);
+}
+.acct-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.acct-av.emo { font-size: 27px; background: rgba(255, 255, 255, .06); }
+.acct-av.txt { background: var(--c); border-color: transparent; color: #fff; font-size: 23px; font-weight: 600; }
+.acct-av .ic { width: 24px; height: 24px; opacity: .5; }
+.acct-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.acct-n { font-size: 16px; font-weight: 600; letter-spacing: .01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acct-n.empty { color: var(--text-3); font-weight: 500; }
+.acct-s { font-size: 11.5px; color: var(--text-3); line-height: 1.5; }
+.acct .chev { width: 16px; height: 16px; opacity: .35; flex: none; }
+
+/* 头像选择：六列，和主题色块同一个节奏 */
+.av-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 9px; }
+.av-pick {
+  aspect-ratio: 1; border-radius: 14px; display: grid; place-items: center;
+  font-size: 22px; line-height: 1; overflow: hidden;
+  background: var(--glass-bg); border: 1px solid var(--line);
+  transition: border-color .15s, transform .12s;
+}
+.av-pick:active { transform: scale(.94); }
+/* 选中的用外描边：照片会把内描边盖住，外描边两种都能看见 */
+.av-pick.on { outline: 2px solid var(--text); outline-offset: 2px; }
+.av-pick img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.av-pick .ic { width: 20px; height: 20px; opacity: .55; }
 
 .tabbar {
   /* 网格的第二行，自然高度。既不是 fixed（兄弟节点被 transform 时 WebView
@@ -953,12 +995,15 @@ html[data-fx="solid"] .tile.on::before { animation: none; }
   text-align: center; padding: 9px 3px; border-radius: 14px;
   background: rgba(255, 255, 255, .045);
   border: 1px solid var(--line);
+  min-width: 0;
 }
 .kpi b {
   display: block; font-size: 13px; font-weight: 600;
   letter-spacing: -.01em; font-variant-numeric: tabular-nums;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* 「135小时27分」这种三段数字在四列里放不下，降一号字而不是切省略号 */
+.kpi b.sm { font-size: 11px; letter-spacing: -.02em; }
 .kpi span { display: block; font-size: 10.5px; color: var(--text-3); margin-top: 3px; }
 .legend b { font-weight: 500; color: var(--text-3); margin-left: 3px; font-variant-numeric: tabular-nums; }
 .legend .more { color: var(--text-3); opacity: .8; }
@@ -1145,6 +1190,28 @@ html[data-motion="off"] .dragghost { transition: none !important; }
 .pie { width: 172px; height: 172px; display: block; }
 .pie .p-lb { font-size: 9.5px; font-weight: 650; letter-spacing: .01em; pointer-events: none; }
 .donut.sm { width: 104px; height: 104px; }
+
+/* 饼图 / 环形：时长用指引线写到图外（番茄 To-Do 那种读法）。
+   图外只放得下时间，名字和占比留在扇区里，所以标签可以一直贴着饼画。 */
+.chart-leads { position: relative; }
+.chart-leads .pie,
+.chart-leads .donut { width: 100%; height: auto; display: block; }
+.chart-leads .donut.leads { transform: none; animation: none; }
+.pie .pl-d {
+  font-size: 9.5px; fill: var(--text-2); font-variant-numeric: tabular-nums;
+  paint-order: stroke; stroke: var(--glass-bg); stroke-width: 2.6px; stroke-linejoin: round;
+}
+.pie .pl-line { fill: none; stroke-width: 1; opacity: .55; }
+.pie-c { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; }
+.pie-c .v { font-size: 18px; font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.pie-c .v .u { font-size: 10.5px; font-weight: 500; }
+.pie-c .k { font-size: 10.5px; color: var(--text-3); margin-top: 1px; }
+
+/* 小屏：四个指标并排会窄到「条记录」竖着排，改成两列 */
+@media (max-width: 380px) {
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .pie .pl-d { font-size: 11px; }
+}
 
 .hours-body { display: flex; align-items: center; gap: 12px; }
 .hours-card { padding-bottom: 14px; }

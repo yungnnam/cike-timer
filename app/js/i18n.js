@@ -40,6 +40,22 @@ const EN = {
   '已保存': 'Saved',
   '已保存，计时继续': 'Saved, timer keeps running',
 
+  /* ---------- 本地账号 ---------- */
+  '设置名字': 'Set a name',
+  '本地账号': 'Local profile',
+  '本地账号 · 名称与头像随备份一起导出':
+    'Local profile · saved with your backup',
+  '仅保存在本机；更换设备前导出备份即可迁移':
+    'Stored on this device only; export a backup to move it',
+  '输入名称': 'Enter a name',
+  '头像': 'Avatar',
+  '从相册选一张': 'Pick a photo',
+  '清除头像': 'Remove avatar',
+  '账号信息已保存': 'Profile saved',
+  '图片读取失败': 'Could not read this image',
+  '可从内置图标或相册选择头像；图片会压缩为 128×128 保存在本机。':
+    'Pick a built-in icon or a photo; images are resized to 128×128 and stored on this device.',
+
   /* ---------- 类型编辑 ---------- */
   '名字': 'Name',
   '例如：学习': 'e.g. Study',
@@ -47,30 +63,30 @@ const EN = {
   '这是个分组': 'This is a group',
   '分组里可以装子类型，比如「学习」里放编程、英语、高数':
     'A group holds child types, e.g. Programming and English inside Study',
-  '里面已经有子类型了，所以一直是分组。': 'It has child types, so it stays a group.',
+  '该类型下已有子类型，因此保持为分组。': 'This type already has subtypes, so it stays a group.',
   '归到分组（可选）': 'Belongs to group (optional)',
   '不分组': 'No group',
-  '先用分组色的深浅': 'Shades of the group colour',
-  '同一分组里想分得开，挑不同深浅最省事；统计图里也会把它们画成同一个色系。':
-    'Pick a different shade to tell them apart; charts keep them in one colour family.',
+  '沿用分组色深浅': 'Follow the group colour',
+  '同一分组内可用不同深浅区分，统计图中保持同一色系。':
+    'Use different shades within a group; charts keep them in one hue family.',
   '颜色': 'Colour',
   '图标': 'Icon',
   '新建分组': 'New group',
   '新建类型': 'New type',
   '编辑类型': 'Edit type',
-  '颜色会用来发光；分组只是容器，也能直接记录':
-    'The colour is used for the glow; a group is just a container and can be tracked too',
+  '颜色用于发光显示；分组作为容器，也可直接记录':
+    'The colour drives the glow; a group is a container and can also be recorded directly',
   '跟分组同色': 'Same as group',
   '跟分组「': 'Same colour as group “',
   '同一个颜色': '”',
   '和「': 'Shade ',
   '」同色系的第': ' of the “',
   '档，统计里能分开': '” family — charts keep them apart',
-  '改色时下面的子类型会一起换；关掉开关就让它们各自保留':
-    'Changing the colour also updates child types; turn this off to keep theirs',
-  '一个分组一种颜色，子类型默认跟着分组走':
-    'One colour per group; child types follow the group by default',
-  '给它起个名字': 'Give it a name',
+  '修改颜色时子类型同步变化；关闭后各自保留':
+    'Subtypes follow the group colour; turn this off to keep them independent',
+  '每个分组一种颜色，子类型默认沿用分组颜色':
+    'One colour per group; subtypes inherit it by default',
+  '给它设置名字': 'Give it a name',
   '已保存': 'Saved',
   '每天': 'Daily',
   '每周': 'Weekly',
@@ -95,7 +111,7 @@ const EN = {
   '最多': 'at most ',
   '小时': 'h',
   '目标已删除': 'Goal deleted',
-  '给目标起个名字': 'Give the goal a name',
+  '给目标设置名字': 'Give the goal a name',
   '目标时长要大于 0': 'Target must be greater than 0',
   '目标已创建': 'Goal created',
 
@@ -106,11 +122,11 @@ const EN = {
   '时长预览': 'Duration',
   '备注': 'Note',
   '标签': 'Tags',
-  '这条还在计时。不动「结束」直接保存，它会接着往下走。':
-    'This one is still running. Save without touching “End” and it keeps going.',
+  '这条记录仍在计时。不点「结束」直接保存，将保持计时。':
+    'This entry is still running. Save without tapping End and it keeps counting.',
   '补记一段时间': 'Add a past entry',
   '编辑记录': 'Edit entry',
-  '拖动墨带选的范围可以在这里微调': 'The range you dragged can be fine-tuned here',
+  '可在此微调所选的时间范围': 'Fine-tune the selected time span here',
   '时间不对': 'Invalid time',
   '已删除这条记录': 'Entry deleted',
   '先选一个类型': 'Pick a type first',
@@ -120,7 +136,7 @@ const EN = {
   /* ---------- 此刻 ---------- */
   '补记': 'Add',
   '新分组': 'New group',
-  '还没开始 · 点下面任意类型就开始': 'Not tracking · tap any type below to start',
+  '尚未开始 · 点击下方任意类型开始计时': 'Not started · tap any type below to begin',
   '今天已记': 'Today',
   '空白': 'Blank',
   '停止': 'Stop',
@@ -131,17 +147,17 @@ const EN = {
   '收起': 'Collapse',
   '展开': 'Expand',
   '已停止并保存': 'Stopped and saved',
-  '太短了，没记下（可以在设置里关掉这个门槛）':
-    'Too short, not saved (you can turn off this threshold in settings)',
+  '记录时间过短，未保存（可在设置中关闭此限制）':
+    'Too short to save (you can turn this limit off in settings)',
   '已移到': 'Moved to ',
-  '还没到那个时间，记不了': 'That time has not arrived yet',
+  '所选时间尚未到达，无法记录': 'That time has not arrived yet',
   '只能两层：分组里不能再放分组': 'Two levels only: no groups inside groups',
   '知道了': 'Got it',
-  '三件事就够用了': 'Three things is all you need',
-  '点一个类型＝开始计时，再点一下就停；': 'Tap a type to start, tap again to stop;',
-  '在墨带上按住拖动，可以补记一段；': 'Drag on the ribbon to log a past stretch;',
-  '长按胶囊或大格子，能拖着换顺序、换分组。':
-    'Long-press a chip or tile to reorder or move it between groups.',
+  '使用说明': 'How it works',
+  '点击类型开始计时，再次点击停止；': 'Tap a type to start; tap again to stop;',
+  '在时间轴上按住拖动可补记一段时间；': 'Press and drag on the timeline to backfill a span;',
+  '长按胶囊或大格子可拖动排序、更换分组。':
+    'Long-press a capsule or tile to reorder it or change its group.',
 
   /* ---------- 记录页 ---------- */
   '今天': 'Today',
@@ -184,6 +200,23 @@ const EN = {
   '点': '',
   '一天': 'day',
   '本周': 'this week',
+  '统计设置': 'Stats settings',
+  '仅影响统计页的统计口径': 'Only changes how the stats page counts',
+  '主要显示范围': 'Main range',
+  '占比、分布、一周节奏、排行均按此范围统计': 'Shares, breakdown, weekly rhythm and ranking follow this range',
+  '周热力图范围': 'Heatmap range',
+  '仅周热力图按此范围统计': 'Only the heatmap follows this range',
+  '统计页除周热力图外均按此范围统计；不选则为全部类型':
+    'All stats except the heatmap follow this range; leave all unticked for every type',
+  '仅影响统计口径，不影响记录：未选中的类型仍可正常记录。':
+    'This only changes what the stats count; unselected types can still be recorded.',
+  '仅影响周热力图的统计范围；未选中的类型仍可正常记录。':
+    'This only changes what the heatmap counts; unselected types can still be recorded.',
+  '以上范围仅决定统计页的统计口径，不影响记录本身。':
+    'These ranges only set what the stats page counts; they never affect your records.',
+  '这个范围里还没有记录': 'No entries in this range yet',
+  '统计页已恢复为全部类型': 'Stats now count all types',
+  '完成': 'Done',
 
   /* ---------- 我的 ---------- */
   '深色': 'Dark',
@@ -197,14 +230,14 @@ const EN = {
   '正在计时的活动会挂在通知栏和锁屏上':
     'The running activity shows in the notification shade and on the lock screen',
   '被关掉了': 'Turned off',
-  '点这里去系统设置里允许通知，锁屏才看得到':
-    'Tap to allow notifications in system settings so the lock screen shows it',
-  '还没开始过': 'Never started',
-  '第一次开始计时后，通知和锁屏上就会有了':
-    'Start a timer once and it will appear in the notification shade and lock screen',
+  '前往系统设置允许通知，锁屏即可显示':
+    'Allow notifications in system settings to show them on the lock screen',
+  '尚未开始': 'Not started yet',
+  '开始计时后，通知栏与锁屏将显示':
+    'Once a timer starts it appears in notifications and on the lock screen',
   '被静音了': 'Silenced',
-  '这条通知在系统里被关掉了，点这里去打开':
-    'This notification is disabled in the system; tap to enable it',
+  '通知已在系统中关闭，点击前往开启':
+    'Notifications are off in system settings; tap to enable',
   '通知': 'Notifications',
   '锁屏与通知栏': 'Lock screen & shade',
   '类型会保留，可以撤销一次': 'Types are kept; you can undo once',
@@ -221,35 +254,35 @@ const EN = {
   '按下、翻页、展开的过渡动画': 'Press, page and expand transitions',
   '已关闭': 'Off',
   '一天从几点开始': 'Day starts at',
-  '熬夜记的时间算到哪一天': 'Which day a late-night entry belongs to',
+  '凌晨记录归属的日期分界': 'The date boundary for late-night entries',
   '撤销提示停留': 'Undo stays for',
-  '改完／删完之后，那条「撤销」留多久': 'How long the “Undo” pill stays after a change',
+  '修改或删除后，「撤销」提示的停留时长': 'How long the Undo prompt stays after an edit or delete',
   '数据': 'Data',
   '导出备份': 'Export backup',
-  'JSON，可再导入回来': 'JSON, can be imported back',
+  'JSON 格式，可重新导入': 'JSON, can be imported again',
   '导出 CSV': 'Export CSV',
-  '给表格软件看': 'For spreadsheets',
+  '可用表格软件打开': 'Opens in a spreadsheet app',
   '导入备份': 'Import backup',
   '载入示例数据': 'Load sample data',
-  '一周虚构记录 + 两个目标，用来先看看界面':
-    'A week of made-up entries plus two goals, to preview the UI',
+  '一周示例记录与两个目标，用于预览界面':
+    'A week of sample entries and two goals, for previewing the UI',
   '清空记录和目标': 'Clear entries and goals',
   '关于': 'About',
   '点按震动': 'Haptics',
   '点按震动已关闭': 'Haptics off',
   '点按震动已开启': 'Haptics on',
-  '所有数据只存在这台设备上，不上传、不需要账号。加到主屏幕后跟普通 App 一样用；装成 APK 时数据在应用自己的目录里，卸载会一起删掉，换机前记得先导一份备份。':
-    'Everything stays on this device: no upload, no account. Add it to your home screen to use it like a normal app; in the APK the data lives in the app folder and is removed on uninstall, so export a backup before switching phones.',
-  '示例数据已载入，随便点开看看': 'Sample data loaded — tap around',
-  '已经有记录了，示例数据不会覆盖你的数据': 'You already have entries; sample data was skipped',
+  '所有数据只存在这台设备上，不上传、也不用注册。上面的名字和头像只是给自己看的，会跟着备份一起导出。加到主屏幕后跟普通 App 一样用；装成 APK 时数据在应用自己的目录里，卸载会一起删掉，换机前记得先导一份备份。':
+    'Everything stays on this device: no upload, no sign-up. The name and avatar above are just for you, and they travel with your backup. Add it to your home screen to use it like a normal app; in the APK the data lives in the app folder and is removed on uninstall, so export a backup before switching phones.',
+  '示例数据已载入': 'Sample data loaded',
+  '已有记录，示例数据不会覆盖现有数据': 'You already have entries; sample data will not overwrite them',
   '清空所有记录和目标？类型会保留，清空后 5 秒内可以撤销。':
     'Clear all entries and goals? Types are kept, and you can undo within 5 seconds.',
   '记录和目标已清空': 'Entries and goals cleared',
-  '如果你常在凌晨活动，把一天的起点设到 4 点，凌晨 1 点的记录就还算「昨天」。':
-    'If you are often up after midnight, set the day start to 4:00 and a 1 a.m. entry still counts as “yesterday”.',
+  '若常在凌晨活动，可将一天的起点设为 4 点，凌晨 1 点的记录仍计入前一天。':
+    'If you are often active after midnight, set the day start to 4:00 so a 1:00 entry still counts as the previous day.',
   'CSV 已导出': 'CSV exported',
   '备份已导出': 'Backup exported',
-  '文件读不出来': 'Cannot read the file',
+  '文件读取失败': 'Cannot read the file',
   '导入失败：': 'Import failed: ',
   '进行中': 'running',
   '正在计时': 'Tracking',
@@ -268,9 +301,9 @@ const EN = {
   '深浅 = 投入多少': 'darker = more time',
   '当时在做什么，或者为什么延长了': 'What were you doing, or why did it run long?',
   '用空格分隔，例如：深度 复习': 'Separate with spaces, e.g. deep focus',
-  '这条还在计时。不动「结束」直接保存，它会接着往下走。':
+  '这条记录仍在计时。不点「结束」直接保存，将保持计时。':
     'This one is still running. Save without touching “End” and it keeps going.',
-  '里面已经有子类型了，所以一直是分组。': 'It already has child types, so it always stays a group.',
+  '该类型下已有子类型，因此保持为分组。': 'It already has child types, so it always stays a group.',
   '跟分组同色': 'Same as group',
   '目标已创建': 'Goal created',
   '没有可撤销的操作': 'Nothing to undo',
@@ -293,11 +326,11 @@ const EN = {
   '关注的分组与类型': 'Focus groups and types',
   '周热力图只算选中的这些；不选就是全部':
     'The weekly heatmap counts only these; none = all',
-  '统计页的周热力图只算这些；一个都不选就是全部':
-    'The weekly heatmap counts only these; leave all unchecked for everything',
+  '仅周热力图按此范围统计；不选则为全部类型':
+    'Only the heatmap follows this range; leave all unticked for every type',
   '整个分组': 'Whole group',
   '只算它自己': 'Only this type',
-  '这里是「看什么」，不是「记什么」：没选中的类型照样可以记，只是不画进周热力图。':
+  '仅影响周热力图的统计范围；未选中的类型仍可正常记录。':
     'This decides what the heatmap shows, not what you can log: unchecked types still record, they just stay out of the heatmap.',
   '周热力图统计全部类型': 'Heatmap now counts all types',
   '项': 'items',
@@ -324,12 +357,12 @@ const EN = {
   '昨天': 'Yesterday',
   '中文': 'Chinese',
   '跟随系统': 'Follow system',
-  '界面文字换成英文；类型名和备注是你自己的数据，不会被翻译':
+  '界面文字切换为英文；类型名与备注属于本地数据，不会被翻译':
     'Interface text switches to English; type names and notes are your own data and stay as they are',
   '这段时间还没有记录': 'No records in this period',
   '还没有记录': 'No records yet',
-  '这个分组还没有子类型 · 在「我的 → 类型」里加':
-    'No child types yet · add them in Me → Types',
+  '该分组暂无子类型 · 可在「我的 → 类型」中添加':
+    'No subtypes yet · add them under Me → Types',
   '在「我的 → 目标」里给自己定一个，比如每周编程 10 小时。':
     'Set one in Me → Goals, e.g. 10 hours of programming a week.',
   '只显示前 10': 'Top 10 only',
@@ -337,9 +370,9 @@ const EN = {
   '现在': 'now',
   '至少': 'at least',
   '不超过': 'at most',
-  '回到「此刻」点一下类型就开始': 'Go to Now and tap a type to start',
-  '一键开始，随手补记。属于你自己的时间账本。':
-    'One tap to start, quick backfill, a ledger that is yours alone.',
+  '回到「此刻」点击类型即可开始': 'Go back to Now and tap a type to begin',
+  '一键开始记录，随时补记。':
+    'One tap to start; backfill any time.',
   '还没有目标': 'No goals yet',
   '还没有类型': 'No types yet',
   '最投入': 'Busiest',
@@ -371,15 +404,15 @@ const EN = {
   '这个类型': 'this type',
   '未分组': 'Ungrouped',
   '最多的是': 'mostly',
-  '没搜到，换个词试试': 'Nothing found — try another word',
+  '没有匹配结果，请更换关键词': 'No matches; try another keyword',
   '子类型一起换色': 'Recolor subtypes too',
-  '还没有分组。分组是个容器，比如「学习」里放编程、英语、高数，统计和目标会把这些子类型合并起来算。':
-    'No groups yet. A group is a container — put Programming, English and Calculus inside “Study”, and stats and goals will add them up together.',
-  '还没有目标。定一个，统计页会帮你盯着。':
-    'No goals yet. Add one and Stats will keep an eye on it.',
+  '还没有分组。分组用于归类子类型，统计与目标会合并计算。':
+    'No groups yet. A group holds subtypes; stats and goals count them together.',
+  '还没有目标。新建目标后，统计页会跟踪进度。':
+    'No goals yet. Add one and the stats page will track it.',
   '个默认类型名也跟着换了': 'default type names updated too',
-  '按下去手机会轻轻一震，反馈更实在':
-    'Your phone gives a tiny buzz on tap, so it feels more solid',
+  '按下时给出轻微震动反馈':
+    'A light vibration on press',
   '一键开始，随手补记。属于你自己的时间账本':
     'One tap to start, quick backfill, a ledger that is yours alone',
 
@@ -390,7 +423,7 @@ const EN = {
   '这是个分组': 'This is a group',
   '统计哪些类型（不选 = 全部）': 'Which types (none = all)',
   '目标时长（小时）': 'Target hours',
-  '太短了，没记下（可以在设置里关掉这个门槛）':
+  '记录时间过短，未保存（可在设置中关闭此限制）':
     'Too short, nothing saved (you can turn this threshold off in Settings)',
   '未分类': 'Uncategorised',
   '空分组': 'Empty group',
@@ -412,8 +445,8 @@ const EN = {
     'If you are often up past midnight, set the day start to 4:00 — a 1 a.m. entry still counts as yesterday.',
   '清空所有记录和目标？类型会保留，清空后 5 秒内可以撤销':
     'Clear all entries and goals? Types stay; you can undo for 5 seconds.',
-  '所有数据只存在这台设备上，不上传、不需要账号。加到主屏幕后跟普通 App 一样用；装成 APK 时数据在应用自己的目录里，卸载会一起删掉，换机前记得先导一份备份':
-    'All data stays on this device — nothing is uploaded and no account is needed. Add it to the home screen and it behaves like a normal app. As an APK the data lives in the app’s own folder, so uninstalling removes it: export a backup before switching phones.',
+  '所有数据只存在这台设备上，不上传、也不用注册。上面的名字和头像只是给自己看的，会跟着备份一起导出。加到主屏幕后跟普通 App 一样用；装成 APK 时数据在应用自己的目录里，卸载会一起删掉，换机前记得先导一份备份':
+    'Everything stays on this device: no upload, no sign-up. The name and avatar above are just for you, and they travel with your backup. Add it to your home screen to use it like a normal app. As an APK the data lives in the app’s own folder, so uninstalling removes it: export a backup before switching phones.',
 };
 
 /* 带数字的句子：格式函数已经按语言生成数字部分，这里只补句子骨架 */
@@ -458,9 +491,10 @@ const RULES = [
   [/^(.+) 已暂停$/, (m) => `${m[1]} paused`],
   [/^(.+) 开始$/, (m) => `${m[1]} started`],
   [/^共 (.+)$/, (m) => `${m[1]} total`],
+  [/^只看 (.+)$/, (m) => `Only ${t(m[1])}`],
   [/^(.+) · 共 (.+)$/, (m) => `${m[1]} · ${m[2]} total`],
-  [/^· 最投入 (\d+)–(\d+) 点$/, (m) => `· busiest ${m[1]}:00–${m[2]}:00`],
-  [/^· 比上期 ([+−-]?\d+)%$/, (m) => `· ${m[1]}% vs previous`],
+  [/^最投入 (\d+)–(\d+) 点$/, (m) => `busiest ${m[1]}:00–${m[2]}:00`],
+  [/^比上期 ([+−-]?\d+)%$/, (m) => `${m[1]}% vs previous`],
   [/^等 (\d+) 类$/, (m) => `and ${m[1]} more`],
   [/^(\d{4}) 年$/, (m) => `${m[1]}`],
   [/^(\d{4}) 年每月$/, (m) => `Monthly · ${m[1]}`],
@@ -520,6 +554,8 @@ const RULES = [
   [/^(.+) · 最近 (\d+) 周共 (.+)$/, (m) => `${t(m[1])} · last ${m[2]} weeks: ${m[3]}`],
   [/^最近 (\d+) 周共 ([^·]+)$/, (m) => `Last ${m[1]} weeks: ${m[2]}`],
   [/^周热力图只统计 (.+)$/, (m) => `Heatmap now counts only ${t(m[1])}`],
+  [/^统计页只统计 (.+)$/, (m) => `Stats now count only ${t(m[1])}`],
+  [/^统计页已恢复为全部类型$/, () => 'Stats now count all types'],
   [/^这 (\d+) 周里，选中的范围还没有记录。$/,
     (m) => `No entries for the selected range in the last ${m[1]} weeks.`],
   [/^(\d+)月(\d+)日 · (.+)$/, (m) => `${MONTHS[(Number(m[1]) - 1) % 12]} ${m[2]} · ${t(m[3])}`],

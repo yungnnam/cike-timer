@@ -35,8 +35,8 @@ export function render() {
 
   ${state.settings.tipDone || state.records.length ? '' : `
   <div class="tip glass" data-tip>
-    <b>三件事就够用了</b>
-    <div>点一个类型＝开始计时，再点一下就停；<br>在墨带上按住拖动，可以补记一段；<br>长按胶囊或大格子，能拖着换顺序、换分组。</div>
+    <b>使用说明</b>
+    <div>点击类型开始计时，再次点击停止；<br>在时间轴上按住拖动可补记一段时间；<br>长按胶囊或大格子可拖动排序、更换分组。</div>
     <button class="tip-x" data-act="tip-done" aria-label="知道了"><svg class="ic sm"><use href="#i-x"/></svg></button>
   </div>`}
 
@@ -78,7 +78,7 @@ function statusHtml(now, cur) {
   if (!cur) {
     return `
   <section class="status glass" style="--c:rgba(108,123,255,.55)">
-    <div class="s-top"><span>还没开始 · 点下面任意类型就开始</span></div>
+    <div class="s-top"><span>尚未开始 · 点击下方任意类型开始计时</span></div>
     <div class="timer idle">00:00</div>
     <div class="s-meta"><span>今天已记 <b>${fmtDur(todayMs)}</b></span><span>空白 <b>${fmtDur(Math.max(0, now - dayStart - todayMs))}</b></span></div>
     <div class="row">
@@ -215,7 +215,7 @@ function groupCard(g, now, cur) {
       <div class="gtiles">
         ${pills}
       </div>
-      ${kids.length ? '' : '<div class="ghint">这个分组还没有子类型 · 在「我的 → 类型」里加</div>'}
+      ${kids.length ? '' : '<div class="ghint">该分组暂无子类型 · 可在「我的 → 类型」中添加</div>'}
     </div>
   </section>`;
 }
@@ -282,7 +282,7 @@ export function mount(root) {
         // 暂停中的再点一下就是继续，别的按钮才是停止
         if (isPaused(cur)) { resumeRunning(); return; }
         stopRunning().then((kept) => {
-          toast(kept ? '已停止并保存' : '太短了，没记下（可以在设置里关掉这个门槛）', { undoable: true });
+          toast(kept ? '已停止并保存' : '记录时间过短，未保存（可在设置中关闭此限制）', { undoable: true });
         });
         return;
       }
@@ -297,7 +297,7 @@ export function mount(root) {
     if (act === 'stop') {
       haptic(14);
       stopRunning().then((kept) => {
-        toast(kept ? '已停止并保存' : '太短了，没记下（可以在设置里关掉这个门槛）', { undoable: true });
+        toast(kept ? '已停止并保存' : '记录时间过短，未保存（可在设置中关闭此限制）', { undoable: true });
       });
     }
     if (act === 'pause') { haptic(10); pauseRunning(); }
@@ -631,7 +631,7 @@ function mountRibbon(root) {
     const e = Math.min(b, Date.now());
     // 只拖到「现在以后」的地方没有可记的时间，别弹一个 0 分钟的抽屉
     if (e - s < 60000) {
-      toast('还没到那个时间，记不了');
+      toast('所选时间尚未到达，无法记录');
       return;
     }
     openRecordEditor({ start: s, end: e });

@@ -88,7 +88,19 @@ export function openSheet({ title = '', sub = '', body = '', foot = '', onMount,
       if (!root.querySelector('.sheet')) document.body.classList.remove('sheet-open');
     }, 420);
   };
-  if (dismissible) backdrop.addEventListener('click', close);
+  /*
+   * 遮罩点击要挡一下「刚打开的那一下」。
+   * 有的是在 pointerup 里开抽屉（墨带上轻点补记）：抽屉一出现，浏览器紧接着
+   * 派发的 click 就落到遮罩上，于是开了又立刻关，看着像「点了没反应」。
+   * 只忽略遮罩自身的头 300ms，抽屉里的按钮不受影响。
+   */
+  const openedAt = Date.now();
+  if (dismissible) {
+    backdrop.addEventListener('click', () => {
+      if (Date.now() - openedAt < 300) return;
+      close();
+    });
+  }
   liveSheets.add(close);
 
   // 抽屉本身是滚动容器（overflow-y:auto），手指一往下拉，浏览器会先把它当成
@@ -382,7 +394,7 @@ export function openRecordEditor({ rec = null, start, end, typeId } = {}) {
     <div class="field"><label>时长预览</label><div class="dur-preview" data-dur>${fmtDur(e0 - s0)}</div></div>
     <div class="field"><label>备注</label><textarea class="inp" data-k="note" placeholder="当时在做什么，或者为什么延长了">${esc(rec?.note || '')}</textarea></div>
     <div class="field"><label>标签</label><input class="inp" data-k="tags" placeholder="用空格分隔，例如：深度 复习" value="${esc((rec?.tags || []).join(' '))}"></div>
-    ${wasRunning ? '<div class="hint">这条还在计时。不动「结束」直接保存，它会接着往下走。</div>' : ''}
+    ${wasRunning ? '<div class="hint">这条记录仍在计时。不点「结束」直接保存，将保持计时。</div>' : ''}
   `;
 
   const foot = isNew
@@ -393,7 +405,7 @@ export function openRecordEditor({ rec = null, start, end, typeId } = {}) {
 
   openSheet({
     title: isNew ? '补记一段时间' : '编辑记录',
-    sub: isNew ? '拖动墨带选的范围可以在这里微调' : '',
+    sub: isNew ? '可在此微调所选的时间范围' : '',
     body, foot,
     onMount(sheet, { close }) {
       wireTypeChips(sheet, (id) => { tid = id; });

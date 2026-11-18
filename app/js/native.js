@@ -6,11 +6,33 @@
  *  - 应用回到前台时再推一次（防止系统把通知清掉、或用户在应用外改了状态）；
  *  - 秒数不靠网页推 —— 通知用 setUsesChronometer，系统自己跳，省电。
  */
-import { running, elapsed, typeById } from './store.js';
+import { state, running, elapsed, typeById } from './store.js';
 import { fmtDur } from './format.js';
 import { t as tr } from './i18n.js';
 
 const MAX_MS = 24 * 3600 * 1000;
+
+/* 计时太久的那次提醒：记录 id → 触发时的小时数。
+   只活在内存里：应用重启后再响一次，比「永远不响」安全。 */
+const longRuns = new Map();
+
+/** 记下这条记录已经提醒过（返回 false 表示之前就提醒过） */
+export function markLongRun(id, hours) {
+  if (!id || longRuns.has(id)) return false;
+  longRuns.set(id, hours);
+  return true;
+}
+
+/** 提醒过就把通知副标题固定成「已计时 N 小时，还在继续吗？」 */
+function longRunNote(id) {
+  const h = longRuns.get(id);
+  if (!h) return '';
+  return warnTextFor(h);
+}
+
+function warnTextFor(hours) {
+  return tr(`已计时 ${hours} 小时，还在继续吗？`);
+}
 
 function bridge() {
   if (typeof window === 'undefined') return null;
@@ -44,7 +66,15 @@ export function syncTimerNotification() {
   const ms = Math.min(MAX_MS, Math.max(0, elapsed(r, Date.now())));
   // 副标题只在暂停时给一句；正常计时时留空，别把「今天已记」塞进通知里。
   // 这句直接进系统通知栏，不经过 DOM，所以要自己翻（tr() 走的是同一份词典）。
-  const note = paused ? `${tr('已暂停')} · ${fmtDur(ms)}` : '';
+  const note = paused
+    ? `${tr('已暂停')} · ${fmtDur(ms)}`
+    : longRunNote(r.id);
+
+  // 计时满 N 小时：原生服务自己到点换文案、震一下（应用在后台时网页定时器是停的）
+  const warnAt = !paused && Number(state.settings.longWarnH) > 0
+    ? Number(state.settings.longWarnH) * 3600 * 1000
+    : 0;
+  const warnText = warnAt ? warnTextFor(Number(state.settings.longWarnH)) : '';
 
   try {
     b.notifyTimer(
@@ -54,6 +84,8 @@ export function syncTimerNotification() {
       r.start,
       paused,
       ms,
+      warnAt,
+      warnText,
     );
   } catch (e) {
     // 原生侧出问题不能影响网页计时

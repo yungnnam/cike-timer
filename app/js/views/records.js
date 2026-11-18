@@ -6,13 +6,23 @@ import {
   state, typeById, elapsed, startOfDay, startOfWeek, startOfMonth, clipped,
 } from '../store.js';
 import { fmtDur, fmtDurS, fmtClock, fmtDay, fmtWeekday, dayStartOf, fmtTimer } from '../format.js';
-import { openRecordEditor, esc } from '../ui.js';
+import { openRecordEditor, openSheet, esc } from '../ui.js';
 import { unfoldRows } from '../motion.js';
 
 const DAY = 86400000;
 let range = 'today';
 let query = '';
 let searching = false;
+let tagFilter = '';
+
+/** 全库标签 → 次数，按次数降序（筛选用） */
+function allTags() {
+  const map = new Map();
+  for (const r of state.records) {
+    for (const t of r.tags || []) if (t) map.set(t, (map.get(t) || 0) + 1);
+  }
+  return [...map.entries()].sort((a, b) => b[1] - a[1]);
+}
 
 function bounds() {
   const now = Date.now();
@@ -41,6 +51,7 @@ function segs() {
   const q = query.trim().toLowerCase();
   return clipped(from, to, Date.now())
     .filter((c) => match(c.rec, q))
+    .filter((c) => !tagFilter || (c.rec.tags || []).includes(tagFilter))
     .reverse();
 }
 
@@ -48,6 +59,7 @@ export function render() {
   const list = segs();
   const sum = list.reduce((a, c) => a + c.ms, 0);
   const now = Date.now();
+  const tags = allTags();
 
   return `
   <div class="top">
@@ -68,6 +80,8 @@ export function render() {
   <div class="chips">
     ${[['today', '今天'], ['yesterday', '昨天'], ['week', '本周'], ['month', '本月']]
       .map(([v, l]) => `<button class="chip ${range === v ? 'on' : ''}" data-range="${v}">${l}</button>`).join('')}
+    ${tagFilter ? `<button class="chip on" data-act="tag-filter">标签 · ${esc(tagFilter)}<svg class="ic sm"><use href="#i-x"/></svg></button>`
+      : (tags.length ? '<button class="chip" data-act="tag-filter">标签</button>' : '')}
   </div>
 
   ${searching ? `<div class="field" style="margin-top:12px">
@@ -111,14 +125,60 @@ function rowHtml(c, now) {
     cut ? '跨天' : '',
     r.note ? esc(r.note) : '',
   ].filter(Boolean).join(' · ');
+  const tags = (r.tags || []);
+  // 一次记满半天以上，多半是忘了停 —— 不拦着，只在行里放一枚提示，点进去就能改
+  const longChip = c.ms >= 12 * 3600 * 1000 ? '<i class="rec-tag warn">可能忘了停</i>' : '';
+  const tagHtml = tags.length || longChip
+    ? `<span class="rec-tags">${tags.slice(0, 4).map((t) => `<i class="rec-tag">${esc(t)}</i>`).join('')}${tags.length > 4 ? `<i class="rec-tag">+${tags.length - 4}</i>` : ''}${longChip}</span>`
+    : '';
   return `<button class="rec" data-rid="${r.id}" style="--c:${color}">
     <i class="rail"></i>
     <span class="mid">
       <span class="nm">${parent ? `<b class="par">${esc(parent.name)}</b>${esc(t.name)}` : esc(t?.name || '未分类')}${run ? '<span class="pin">进行中</span>' : (paused ? '<span class="pin">暂停</span>' : '')}</span>
       <span class="sub">${sub}</span>
+      ${tagHtml}
     </span>
     <span class="dur">${run ? fmtTimer(c.ms) : fmtDurS(c.ms)}</span>
   </button>`;
+}
+
+/** 按标签筛选：列出这段时间里出现过的标签，按占用时长排序 */
+function openTagSheet() {
+  const [from, to] = bounds();
+  const segsNow = clipped(from, to, Date.now());
+  const map = new Map();
+  for (const c of segsNow) {
+    for (const t of c.rec.tags || []) {
+      const e = map.get(t) || { n: 0, ms: 0 };
+      e.n += 1;
+      e.ms += c.ms;
+      map.set(t, e);
+    }
+  }
+  const list = [...map.entries()].sort((a, b) => b[1].ms - a[1].ms);
+  const body = list.length
+    ? `<div class="list glass">
+        <button class="li" data-tagpick=""><span class="tt">不限标签<small>看这段时间的全部记录</small></span>
+          <span class="vv">${tagFilter ? '' : '✓'}</span></button>
+        ${list.map(([t, v]) => `<button class="li" data-tagpick="${esc(t)}">
+          <span class="tt">${esc(t)}<small>${v.n} 条记录</small></span>
+          <span class="vv">${fmtDur(v.ms)}${tagFilter === t ? ' ✓' : ''}</span></button>`).join('')}
+      </div>`
+    : `<div class="empty">这段时间还没有标签<br>在补记或编辑记录时点「标签」可以加上</div>`;
+  openSheet({
+    title: '按标签筛选',
+    sub: '标签是所有记录共用的横向归类',
+    body,
+    onMount(sheet, { close }) {
+      sheet.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-tagpick]');
+        if (!b) return;
+        tagFilter = b.dataset.tagpick || '';
+        close();
+        window.__app.render();
+      });
+    },
+  });
 }
 
 export function mount(root) {
@@ -141,8 +201,9 @@ export function mount(root) {
     }
     if (act === 'add') {
       const now = Date.now();
-      openRecordEditor({ start: now - 30 * 60000, end: now });
+      openRecordEditor({ end: now });
     }
+    if (act === 'tag-filter') openTagSheet();
   });
 
   const input = root.querySelector('[data-search]');
@@ -178,7 +239,9 @@ export function tick() {
   }
   const sub = root.querySelector('.h-sub');
   if (sub) {
-    const list = clipped(from, to, now).filter((c) => match(c.rec, query.trim().toLowerCase()));
+    const list = clipped(from, to, now)
+      .filter((c) => match(c.rec, query.trim().toLowerCase()))
+      .filter((c) => !tagFilter || (c.rec.tags || []).includes(tagFilter));
     sub.textContent = `${list.length} 条 · 合计 ${fmtDur(list.reduce((a, c) => a + c.ms, 0))}`;
   }
 }

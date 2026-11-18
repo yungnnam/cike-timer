@@ -2,7 +2,7 @@
    策略：网络优先、离线回退缓存。这样开发时改了文件刷新就能看到；
    断网或装到主屏后照样能打开。 */
 
-const CACHE = 'cike-v43';
+const CACHE = 'cike-v46';
 const SHELL = [
   './',
   './index.html',
@@ -17,6 +17,7 @@ const SHELL = [
   './js/ui.js',
   './js/editors.js',
   './js/scopesheet.js',
+  './js/demo.js',
   './js/views/now.js',
   './js/views/records.js',
   './js/views/stats.js',

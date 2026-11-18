@@ -173,6 +173,34 @@ function subLine(parts) {
   return parts.filter(Boolean).map((p) => `<span class="s">${p}</span>`).join('');
 }
 
+/** 标签分布：只在这段时间真的用过标签时才出现。
+    它跟「分组/类型」是两条独立的轴，所以不跟 grain 的切换走。 */
+function tagCard(from, to, now, total) {
+  const scope = mainSet();
+  const map = new Map();
+  for (const c of clipped(from, to, now)) {
+    if (scope && !scope.has(c.rec.typeId)) continue;
+    const tags = c.rec.tags || [];
+    if (!tags.length) continue;
+    for (const t of tags) map.set(t, (map.get(t) || 0) + c.ms / tags.length);
+  }
+  if (!map.size) return '';
+  const all = [...map.entries()].sort((a, b) => b[1] - a[1]);
+  const rows = all.slice(0, 6);
+  const max = rows[0][1] || 1;
+  return `<section class="card glass">
+    <div class="card-h"><span class="card-t">标签</span>
+      <span class="muted">${all.length} 个 · 占范围内时长</span></div>
+    ${rows.map(([t, ms]) => `<div class="tagline">
+      <span class="tag-nm">${esc(t)}</span>
+      <span class="tag-bar"><i style="width:${Math.max(2, (ms / max) * 100).toFixed(1)}%"></i></span>
+      <b>${fmtDurS(ms)}</b>
+      <span class="pct">${total ? ((ms / total) * 100).toFixed(0) : 0}%</span>
+    </div>`).join('')}
+    ${all.length > rows.length ? `<div class="muted" style="margin-top:8px;font-size:11.5px">另有 ${all.length - rows.length} 个标签未列出</div>` : ''}
+  </section>`;
+}
+
 export function render() {
   const now = Date.now();
   const [from, to] = bounds();
@@ -228,6 +256,7 @@ export function render() {
     <div class="card-h"><span class="card-t">分布</span>
       <span class="muted">${range === 'today' || range === 'yesterday' ? '0 – 24 时' : range === 'week' ? '本周 7 天' : range === 'month' ? '本月每天' : `${yearOf(from)} 年每月`}</span></div>
     ${bars(from, to, now)}
+    ${foldLegend(rows)}
   </section>
 
   ${heatCard(cur, rows)}`;
@@ -256,6 +285,9 @@ export function render() {
     }).join('')}
   </section>`;
 
+  /* 标签：横向归类的另一条轴。一条记录带多个标签时按个数均分，避免重复计入总数 */
+  const tagLine = tagCard(from, to, now, cur.total);
+
   return `
   <div class="top">
     <div>
@@ -283,6 +315,8 @@ export function render() {
   ${weekHeat(now)}
 
   ${cur.total === 0 ? '' : rankCard}
+
+  ${tagLine}
 
   ${goalsCard(now)}
   `;
@@ -348,6 +382,11 @@ function inkFor(hex) {
   return l > 150 ? '#0e1118' : '#ffffff';
 }
 
+/** 时间标签的行距（viewBox 单位）。字号 9.5px、行高约 15px，
+    画布在手机上会被缩到 0.9 倍左右，所以留到 20 才不会上下贴住。
+    chartBox 里的画布高度必须用同一个值，否则标签会掉出画布。 */
+const LEAD_GAP = 20;
+
 /** 同侧的时间标签按 y 排开，互相不压：先照原位置排，再整体上推/下压，最后夹回画布 */
 function spreadLabels(boxes, minGap, top, bottom) {
   boxes.sort((a, b) => a.y - b.y);
@@ -376,19 +415,23 @@ function leadLayer(slices, g) {
     const y = cy + Math.sin(it.mid) * (r + 4);
     (x >= cx ? right : left).push({ it, y });
   }
-  spreadLabels(right, 13, 12, H - 12);
-  spreadLabels(left, 13, 12, H - 12);
-  const side = (boxes, dir) => boxes.map(({ it, y }) => {
+  spreadLabels(right, LEAD_GAP, 14, H - 14);
+  spreadLabels(left, LEAD_GAP, 14, H - 14);
+  const side = (boxes, dir) => boxes.map(({ it, y }, i) => {
     const a = it.mid;
     const c = colorOf(it.s);
     const p1x = cx + Math.cos(a) * r;
     const p1y = cy + Math.sin(a) * r;
     const p2x = cx + Math.cos(a) * (r + 8);
     const p2y = cy + Math.sin(a) * (r + 8);
-    const ex = cx + dir * (r + 14);
-    const tx = cx + dir * (r + 18);
+    // 同一侧的折线错开一点：都走同一个 x 会叠成一根粗线，缩到手机上更糊
+    const off = 9 + Math.min(i, 6) * 4;
+    const ex = cx + dir * (r + off);
+    const tx = cx + dir * (r + off + 5);
+    // 先贴着圆环走出去，再竖直挪到标签的 y，最后写时间 —— 折线始终在环外，
+    // 不会像「直接斜连到标签」那样横穿扇区。
     return `<path class="pl-line" stroke="${c}"
-      d="M ${p1x.toFixed(1)} ${p1y.toFixed(1)}L ${p2x.toFixed(1)} ${p2y.toFixed(1)}L ${ex.toFixed(1)} ${y.toFixed(1)}"/>
+      d="M ${p1x.toFixed(1)} ${p1y.toFixed(1)}L ${p2x.toFixed(1)} ${p2y.toFixed(1)}L ${ex.toFixed(1)} ${p2y.toFixed(1)}L ${ex.toFixed(1)} ${y.toFixed(1)}L ${tx.toFixed(1)} ${y.toFixed(1)}"/>
       <text class="pl-d" x="${tx.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${dir > 0 ? 'start' : 'end'}"
         dominant-baseline="central">${fmtDurS(it.s.ms)}</text>`;
   }).join('');
@@ -404,13 +447,13 @@ function chartBox(slices, R) {
     if (Math.cos(it.mid) >= 0) right += 1;
     else left += 1;
   }
-  const H = Math.max(2 * R + 26, Math.max(right, left) * 13 + 26);
-  return { W: 310, H: Math.round(H), cx: 155, cy: Math.round(H) / 2 };
+  const H = Math.max(2 * R + 24, Math.max(right, left) * LEAD_GAP + 26);
+  return { W: 290, H: Math.round(H), cx: 145, cy: Math.round(H) / 2 };
 }
 
 /** 实心饼：扇区里写名字和占比（只写占比 ≥5% 的，免得挤成一团），图外挂时间 */
 function pieChart(rows, total) {
-  const R = 62;
+  const R = 70;
   let a = -Math.PI / 2;
   const slices = rows.map((s) => {
     const frac = s.ms / total;
@@ -464,7 +507,7 @@ function ringArc(cx, cy, r, a0, a1, color) {
 
 /** 环形图：中间留空放总数，外面同样挂时间标签 */
 function ringChart(rows, total) {
-  const R = 62;
+  const R = 70;
   let a = -Math.PI / 2;
   const slices = rows.map((s) => {
     const frac = s.ms / total;
@@ -663,7 +706,22 @@ function heatCard(cur, rows) {
       <span class="muted">${top ? `最多的是${esc(top.type?.name || '未分类')}` : '深浅 = 投入多少'}</span></div>
     <div class="heat">${lines}</div>
     <div class="heat-x"><span></span>${[0, 4, 8, 12, 16, 20].map((h) => `<span>${h}时</span>`).join('')}</div>
+    ${foldLegend(rows)}
   </section>`;
+}
+
+/* 颜色对照：分布、一周节奏这些格子图没有文字，色块又常常很接近，
+   给一个默认收起的下拉，展开后逐行写清「这个颜色是哪一项」。 */
+function foldLegend(rows) {
+  const list = rows.filter((s) => s.ms > 0);
+  if (list.length < 2) return '';
+  const body = list.slice(0, 12).map((s) => `<div class="fl-row">
+      <i style="--c:${colorOf(s)}"></i><span class="fl-nm">${esc(s.type?.name || '未分类')}</span>
+      <b>${fmtDurS(s.ms)}</b></div>`).join('');
+  return `<details class="fold-legend">
+    <summary><span>颜色对照</span><em>${list.length} 项</em><svg class="ic chev"><use href="#i-chevron"/></svg></summary>
+    <div class="fl-body">${body}</div>
+  </details>`;
 }
 
 /* 周热力图：最近 12 周 × 一周七天，每格 = 那一天的合计时长。

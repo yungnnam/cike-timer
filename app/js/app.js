@@ -1,9 +1,9 @@
 /* 启动、路由、主题、每秒心跳 */
 
-import { state, init, sub, seedDemo, followLangNames } from './store.js';
+import { state, init, sub, seedDemo, followLangNames, running, elapsed } from './store.js';
 import { installPress, setHaptics, unfold, haptic } from './motion.js';
-import { closeAllSheets } from './ui.js';
-import { installNativeTimer, syncTimerNotification, systemDark, onSystemThemeChange } from './native.js';
+import { closeAllSheets, toast } from './ui.js';
+import { installNativeTimer, syncTimerNotification, systemDark, onSystemThemeChange, markLongRun, hasNotify } from './native.js';
 import { setLang, installAutoTranslate, translateRoot, getLang } from './i18n.js';
 import * as nowView from './views/now.js';
 import * as recordsView from './views/records.js';
@@ -302,6 +302,27 @@ function render() {
 function tick() {
   const v = views[route];
   try { v?.tick?.(); } catch (e) { /* 忽略 */ }
+  try { checkLongRun(); } catch (e) { /* 提醒失败不能影响计时 */ }
+}
+
+/**
+ * 计时太久没停：满 N 小时提醒一次。
+ * 通知栏那张卡片会被换成「已计时 N 小时，还在继续吗？」，同时轻震一下。
+ * 只在装成 APK 时有声音有震动；网页版只弹一条 toast，免得静默什么都没发生。
+ */
+function checkLongRun() {
+  const hours = Number(state.settings.longWarnH) || 0;
+  if (!hours) return;
+  const r = running();
+  if (!r || r.pausedAt != null) return;
+  if (elapsed(r, Date.now()) < hours * 3600 * 1000) return;
+  if (!markLongRun(r.id, hours)) return;
+  // 通知栏那张卡片换成提醒文案（APK）；网页版没有通知栏，靠下面这条 toast
+  syncTimerNotification();
+  // 原生服务到点会自己震一次，这里再震就是双震；只有网页版补这一下
+  if (!hasNotify() && state.settings.haptics !== false) haptic(30);
+  const name = state.types.find((x) => x.id === r.typeId)?.name;
+  toast(name ? `「${name}」已计时 ${hours} 小时，还在继续吗？` : `已计时 ${hours} 小时，还在继续吗？`);
 }
 
 function fatal(msg) {

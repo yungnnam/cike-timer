@@ -2,9 +2,9 @@
 
 import {
   state, typeById, addRecord, updateRecord, deleteRecord, undo, canUndo,
-  topTypes, childTypes,
+  topTypes, childTypes, saveSettings,
 } from './store.js';
-import { fmtDur, toLocalInput, fromLocalInput, hexA } from './format.js';
+import { fmtDur, fmtClock, toLocalInput, fromLocalInput, hexA } from './format.js';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -71,7 +71,7 @@ export function openSheet({ title = '', sub = '', body = '', foot = '', onMount,
     removeTouchHandlers();
     backdrop.classList.remove('in');
     sheet.classList.remove('in');
-    // 淡出的这 420ms 里，遮罩和抽屉都别再挡路：否则刚关掉就点一下，
+    // 淡出的这 350ms 里，遮罩和抽屉都别再挡路：否则刚关掉就点一下，
     // 那一下会被还在淡出的遮罩吃掉，看着就是「点了没反应」。
     sheet.classList.add('closing');
     backdrop.style.pointerEvents = 'none';
@@ -86,7 +86,7 @@ export function openSheet({ title = '', sub = '', body = '', foot = '', onMount,
       backdrop.remove();
       sheet.remove();
       if (!root.querySelector('.sheet')) document.body.classList.remove('sheet-open');
-    }, 420);
+    }, 350);
   };
   /*
    * 遮罩点击要挡一下「刚打开的那一下」。
@@ -376,25 +376,68 @@ export function wireTypeChips(sheet, onChange) {
 
 /* ---------------- 记录编辑抽屉 ---------------- */
 
+const DUR_PRESETS = [15, 30, 45, 60, 90, 120];
+const MAX_DUR_MIN = 24 * 60;
+
+/** 全库标签，按出现次数排序 —— 用作输入建议 */
+function knownTags() {
+  const map = new Map();
+  for (const r of state.records) {
+    for (const t of r.tags || []) if (t) map.set(t, (map.get(t) || 0) + 1);
+  }
+  return [...map.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
+}
+
 export function openRecordEditor({ rec = null, start, end, typeId } = {}) {
   const isNew = !rec;
   const wasRunning = !!rec && rec.end == null;
   let tid = typeId || rec?.typeId || state.settings.lastType || state.types[0]?.id || null;
-  const s0 = rec ? rec.start : (start ?? Date.now() - 15 * 60000);
+  const s0 = rec ? rec.start : (start ?? Date.now() - 30 * 60000);
   const e0 = rec ? (rec.end ?? Date.now()) : (end ?? Date.now());
-  const color = typeById(tid)?.color || '#6C7BFF';
+  const clampDur = (m) => Math.max(1, Math.min(MAX_DUR_MIN, Math.round(m)));
+  // 新补记默认用上次填过的时长（第一次是 30 分钟）；点时间轴拖出来的区间照传入值走
+  let dur = clampDur(start != null && end != null ? (e0 - s0) / 60000 : (Number(state.settings.lastDur) || 30));
+  // 新记录默认「按时长」——用户脑子里是「做了 30 分钟」，不是「8:30 开始」；
+  // 改老记录时两点都是已知的，默认还给他两点视图。
+  let mode = isNew ? 'dur' : 'time';
+  const picked = new Set(rec?.tags || []);
   const eInit = toLocalInput(e0);
+  const color = typeById(tid)?.color || '#6C7BFF';
+  const known = knownTags().filter((t) => !picked.has(t)).slice(0, 8);
+
+  const tagChip = (t) => `<span class="tag-chip" data-tag="${esc(t)}">${esc(t)}<button class="tag-x" data-tagdel aria-label="删除标签">×</button></span>`;
 
   const body = `
     <div class="field"><label>类型</label>${typeChips(tid)}</div>
-    <div class="two">
-      <div class="field"><label>开始</label><input class="inp" type="datetime-local" data-k="start" value="${toLocalInput(s0)}"></div>
-      <div class="field"><label>结束</label><input class="inp" type="datetime-local" data-k="end" value="${eInit}"></div>
+    <div class="seg-ctrl mini mode-switch" data-mode>
+      <button data-m="dur" class="${mode === 'dur' ? 'on' : ''}">按时长</button>
+      <button data-m="time" class="${mode === 'time' ? 'on' : ''}">按时间</button>
     </div>
-    <div class="field"><label>时长预览</label><div class="dur-preview" data-dur>${fmtDur(e0 - s0)}</div></div>
+    <div class="field" data-pane="dur" ${mode === 'dur' ? '' : 'hidden'}>
+      <label>时长</label>
+      <div class="chips dpick" data-dpick>${DUR_PRESETS.map((m) => `
+        <button class="chip" data-preset="${m}">${fmtDur(m * 60000)}</button>`).join('')}</div>
+      <div class="dur-row">
+        <button class="stepper" data-step="-5" aria-label="减少 5 分钟">−</button>
+        <input class="inp mini-num" type="number" inputmode="numeric" min="1" max="1440" data-k="dur" value="${dur}">
+        <span class="dur-unit">分钟</span>
+        <button class="stepper" data-step="5" aria-label="增加 5 分钟">+</button>
+      </div>
+    </div>
+    <div class="field" data-pane="time" ${mode === 'time' ? '' : 'hidden'}>
+      <label>开始</label><input class="inp" type="datetime-local" data-k="start" value="${toLocalInput(s0)}">
+    </div>
+    <div class="field"><label>结束</label><input class="inp" type="datetime-local" data-k="end" value="${eInit}"></div>
+    <div class="range-line"><span data-range></span><b data-dur></b></div>
     <div class="field"><label>备注</label><textarea class="inp" data-k="note" placeholder="当时在做什么，或者为什么延长了">${esc(rec?.note || '')}</textarea></div>
-    <div class="field"><label>标签</label><input class="inp" data-k="tags" placeholder="用空格分隔，例如：深度 复习" value="${esc((rec?.tags || []).join(' '))}"></div>
-    ${wasRunning ? '<div class="hint">这条记录仍在计时。不点「结束」直接保存，将保持计时。</div>' : ''}
+    <div class="field"><label>标签</label>
+      <div class="tag-ed" data-taged>${[...picked].map(tagChip).join('')}
+        <input class="tag-inp" data-k="tag" placeholder="输入后回车，可加多个">
+      </div>
+      <div class="hint">标签用来横向归类（如「深度」「复习」）：记录页可按标签筛选，统计页会汇总。</div>
+      ${known.length ? `<div class="tag-sug">${known.map((t) => `<button class="chip sm" data-sugtag="${esc(t)}">${esc(t)}</button>`).join('')}</div>` : ''}
+    </div>
+    <div class="hint" data-runhint hidden></div>
   `;
 
   const foot = isNew
@@ -405,27 +448,116 @@ export function openRecordEditor({ rec = null, start, end, typeId } = {}) {
 
   openSheet({
     title: isNew ? '补记一段时间' : '编辑记录',
-    sub: isNew ? '可在此微调所选的时间范围' : '',
+    sub: isNew ? '填时长就行，开始时间会自动算好' : '',
     body, foot,
     onMount(sheet, { close }) {
       wireTypeChips(sheet, (id) => { tid = id; });
 
+      const durInput = $('[data-k="dur"]', sheet);
       const inpStart = $('[data-k="start"]', sheet);
       const inpEnd = $('[data-k="end"]', sheet);
       const durEl = $('[data-dur]', sheet);
-      // 「结束」没被动过 → 对一条正在计时的记录来说，就是「接着记」
-      const endTouched = () => inpEnd.value !== eInit;
-      const refresh = () => {
-        const a = fromLocalInput(inpStart.value);
-        const b = fromLocalInput(inpEnd.value);
-        const fixed = Number.isFinite(a) && Number.isFinite(b) && b > a;
-        durEl.textContent = fixed ? fmtDur(b - a) : '时间不对';
-        durEl.style.color = fixed ? 'var(--text)' : '#ff8a80';
+      const rangeEl = $('[data-range]', sheet);
+      const paneDur = $('[data-pane="dur"]', sheet);
+      const paneTime = $('[data-pane="time"]', sheet);
+      const runHint = $('[data-runhint]', sheet);
+      const tagEd = $('[data-taged]', sheet);
+      const tagInput = $('[data-k="tag"]', sheet);
+
+      const endVal = () => fromLocalInput(inpEnd.value);
+      const startVal = () => (mode === 'dur'
+        ? endVal() - (Number(durInput.value) || 0) * 60000
+        : fromLocalInput(inpStart.value));
+
+      const paintTags = () => {
+        $$('.tag-chip', tagEd).forEach((el) => el.remove());
+        tagEd.insertAdjacentHTML('afterbegin', [...picked].map(tagChip).join(''));
+        $$('[data-sugtag]', sheet).forEach((b) => { b.hidden = picked.has(b.dataset.sugtag); });
       };
+
+      const refresh = () => {
+        const a = startVal();
+        const b = endVal();
+        const ok = Number.isFinite(a) && Number.isFinite(b) && b > a;
+        durEl.textContent = ok ? fmtDur(b - a) : '时间不对';
+        durEl.removeAttribute('title');
+        durEl.style.color = ok ? 'var(--text)' : '#ff8a80';
+        rangeEl.textContent = ok ? `${fmtClock(a)} – ${fmtClock(b)}` : '';
+        const mins = Math.max(1, Math.round((b - a) / 60000));
+        $$('[data-preset]', sheet).forEach((c) => {
+          c.classList.toggle('on', mode === 'dur' && Number(c.dataset.preset) === mins);
+        });
+        if (wasRunning) {
+          const ends = mode === 'dur' || inpEnd.value !== eInit;
+          runHint.hidden = false;
+          runHint.textContent = ends
+            ? '保存后，这条记录会结束计时。'
+            : '这条记录仍在计时。不点「结束」直接保存，将保持计时。';
+        }
+      };
+
+      durInput.addEventListener('input', () => { dur = clampDur(Number(durInput.value) || 1); refresh(); });
       inpStart.addEventListener('input', refresh);
       inpEnd.addEventListener('input', refresh);
 
+      $('[data-mode]', sheet).addEventListener('click', (e) => {
+        const b = e.target.closest('[data-m]');
+        if (!b) return;
+        mode = b.dataset.m;
+        $$('[data-m]', sheet).forEach((x) => x.classList.toggle('on', x === b));
+        paneDur.hidden = mode !== 'dur';
+        paneTime.hidden = mode !== 'time';
+        if (mode === 'time') {
+          inpStart.value = toLocalInput(endVal() - (Number(durInput.value) || 0) * 60000);
+        }
+        refresh();
+      });
+
+      $('[data-dpick]', sheet).addEventListener('click', (e) => {
+        const b = e.target.closest('[data-preset]');
+        if (!b) return;
+        dur = clampDur(Number(b.dataset.preset));
+        durInput.value = dur;
+        refresh();
+      });
+
+      $$('[data-step]', sheet).forEach((b) => b.addEventListener('click', () => {
+        dur = clampDur((Number(durInput.value) || 0) + Number(b.dataset.step));
+        durInput.value = dur;
+        refresh();
+      }));
+
+      const commitTag = () => {
+        // 只留「像标签」的东西：去掉标点/空白，纯符号不算标签
+        const raw = tagInput.value.trim().replace(/[,，、;；:：]/g, '').trim().slice(0, 12);
+        if (!raw || !/[\w\u4e00-\u9fa5]/.test(raw)) { tagInput.value = ''; return; }
+        picked.add(raw);
+        tagInput.value = '';
+        paintTags();
+      };
+      tagInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ',' || e.key === '，') { e.preventDefault(); commitTag(); }
+        else if (e.key === 'Backspace' && !tagInput.value && picked.size) {
+          const last = [...picked].pop();
+          picked.delete(last);
+          paintTags();
+        }
+      });
+      tagInput.addEventListener('blur', commitTag);
+
       sheet.addEventListener('click', async (e) => {
+        const del = e.target.closest('[data-tagdel]');
+        if (del) {
+          picked.delete(del.closest('[data-tag]').dataset.tag);
+          paintTags();
+          return;
+        }
+        const sug = e.target.closest('[data-sugtag]');
+        if (sug) {
+          picked.add(sug.dataset.sugtag);
+          paintTags();
+          return;
+        }
         const btn = e.target.closest('[data-do]');
         if (!btn) return;
         const act = btn.dataset.do;
@@ -439,15 +571,22 @@ export function openRecordEditor({ rec = null, start, end, typeId } = {}) {
         }
 
         if (act === 'save') {
-          const a = fromLocalInput(inpStart.value);
-          const b = fromLocalInput(inpEnd.value);
-          const keepRunning = wasRunning && !endTouched();
-          if (!Number.isFinite(a) || !Number.isFinite(b) || (!keepRunning && b <= a)) { refresh(); return; }
+          commitTag();
+          const a = startVal();
+          const b = endVal();
+          const keepRunning = wasRunning && mode === 'time' && inpEnd.value === eInit;
+          if (!Number.isFinite(a) || !Number.isFinite(b) || (!keepRunning && b <= a)) {
+            refresh();
+            toast('时间不对，检查一下');
+            return;
+          }
+          if (b > Date.now() + 60000) { toast('结束时间不能晚于现在'); return; }
           if (!tid) { toast('先选一个类型'); return; }
           const note = $('[data-k="note"]', sheet).value.trim();
-          const tags = $('[data-k="tags"]', sheet).value.split(/\s+/).filter(Boolean);
+          const tags = [...picked];
           if (isNew) {
             const { trimmed } = await addRecord({ typeId: tid, start: a, end: b, note, tags });
+            await saveSettings({ lastDur: Math.max(1, Math.round((b - a) / 60000)) });
             close();
             toast(
               `已记下 ${fmtDur(b - a)}${trimmed > 0 ? `，覆盖了重叠的 ${fmtDur(trimmed)}` : ''}`,
@@ -460,6 +599,8 @@ export function openRecordEditor({ rec = null, start, end, typeId } = {}) {
           }
         }
       });
+
+      refresh();
     },
   });
 }

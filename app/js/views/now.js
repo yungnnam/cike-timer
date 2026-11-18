@@ -305,7 +305,7 @@ export function mount(root) {
     if (act === 'pick') openTypePicker({ onPick: (id) => startType(id) });
     if (act === 'add-past') {
       const now = Date.now();
-      openRecordEditor({ start: now - 30 * 60000, end: now });
+      openRecordEditor({ end: now });
     }
     if (act === 'new-type') openTypeEditor(null);
     if (act === 'new-group') openTypeEditor(null, { isGroup: true });

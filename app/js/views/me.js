@@ -8,6 +8,7 @@ import {
 import { fmtDur, fmtISO, hexA } from '../format.js';
 import { openTypeEditor, openGoalEditor } from '../editors.js';
 import { openSheet, toast, esc } from '../ui.js';
+import { openDemo } from '../demo.js';
 import { hasNotify, notifyStatus, openNotifySettings, requestNotify } from '../native.js';
 import { isEn } from '../i18n.js';
 
@@ -16,6 +17,8 @@ const THEMES = [['dark', '深色'], ['light', '浅色'], ['auto', '跟随系统'
 const LANGS = [['zh', '中文'], ['en', 'English'], ['auto', '跟随系统']];
 // 撤销条停留多久（毫秒 → 显示文案）
 const UNDO_CHOICES = [[3000, '3 秒'], [5000, '5 秒'], [8000, '8 秒'], [10000, '10 秒']];
+// 计时满几个小时提醒一次；0 = 不提醒
+const LONG_WARN_CHOICES = [[0, '关闭'], [2, '2 小时'], [4, '4 小时'], [8, '8 小时']];
 // 头像候选：11 个表情 + 1 个「相册」，正好铺满两行六列
 const AVATARS = ['🌱', '☕', '📚', '💻', '🎧', '🏃', '🌙', '🍀', '🔥', '🎯', '🐱'];
 
@@ -220,6 +223,10 @@ export function render() {
       <span class="tt">一天从几点开始<small>凌晨记录归属的日期分界</small></span>
       <span class="vv">${String(state.settings.dayStart || 0).padStart(2, '0')}:00</span>
     </button>
+    <button class="li" data-act="long-warn">
+      <span class="tt">长时计时提醒<small>计时超过这个时长，提醒一次「还在继续吗」</small></span>
+      <span class="vv">${(LONG_WARN_CHOICES.find(([v]) => v === (Number(state.settings.longWarnH) || 0)) || [0, '关闭'])[1]}</span>
+    </button>
     <div class="li" style="display:block">
       <div style="margin-bottom:9px;font-size:14.5px">撤销提示停留
         <small style="display:block;color:var(--text-3);font-size:12px;margin-top:3px">修改或删除后，「撤销」提示的停留时长</small>
@@ -231,6 +238,22 @@ export function render() {
   </div>
 
   ${notifySection()}
+  <div class="sec-t">演示</div>
+  <div class="list glass">
+    <button class="li" data-act="demo" data-demo="backfill">
+      <span class="tt">补记<small>选类型、填时长，开始时间自动算好</small></span>
+      <span class="vv"><svg class="ic sm"><use href="#i-play"/></svg></span>
+    </button>
+    <button class="li" data-act="demo" data-demo="tags">
+      <span class="tt">标签<small>加标签、按标签筛选、统计里的标签卡</small></span>
+      <span class="vv"><svg class="ic sm"><use href="#i-play"/></svg></span>
+    </button>
+    <button class="li" data-act="demo" data-demo="longwarn">
+      <span class="tt">长时计时提醒<small>忘记停表时，通知栏会问一句</small></span>
+      <span class="vv"><svg class="ic sm"><use href="#i-play"/></svg></span>
+    </button>
+  </div>
+
   <div class="sec-t">数据</div>
   <div class="list glass">
     <button class="li" data-act="export-json">
@@ -258,8 +281,8 @@ export function render() {
   <div class="sec-t">关于</div>
   <div class="list glass">
     <div class="li">
-      <span class="tt">此刻 <small>v1.2.6 正式版</small></span>
-      <span class="vv">构建 cike-v43</span>
+      <span class="tt">此刻 <small>v1.3.2 正式版</small></span>
+      <span class="vv">构建 cike-v46</span>
     </div>
     <div class="li" style="display:block;color:var(--text-3);font-size:12.5px;line-height:1.7">
       所有数据只存在这台设备上，不上传、也不用注册。上面的名字和头像只是给自己看的，会跟着备份一起导出。加到主屏幕后跟普通 App 一样用；装成 APK 时数据在应用自己的目录里，卸载会一起删掉，换机前记得先导一份备份。
@@ -310,6 +333,7 @@ export function mount(root) {
     if (!act) return;
 
     if (act === 'new-type') openTypeEditor(null);
+    if (act === 'demo') openDemo(e.target.closest('[data-demo]')?.dataset.demo);
     if (act === 'profile') openProfileSheet();
     if (act === 'new-group') openTypeEditor(null, { isGroup: true });
     if (act === 'new-goal') openGoalEditor(null);
@@ -326,6 +350,7 @@ export function mount(root) {
       toast(state.settings.haptics === false ? '点按震动已关闭' : '点按震动已开启');
     }
     if (act === 'day-start') openDayStartSheet();
+    if (act === 'long-warn') openLongWarnSheet();
     if (act === 'notify-settings') {
       // 先去系统设置页看一眼；如果通知权限本身还没给，顺手再问一次
       const st = notifyStatus();
@@ -432,6 +457,27 @@ function openDayStartSheet() {
         close();
         window.__app.render();
         toast('已保存');
+      });
+    },
+  });
+}
+
+/** 长时计时提醒：满 N 小时在通知栏问一句「还在继续吗」 */
+function openLongWarnSheet() {
+  const cur = Number(state.settings.longWarnH) || 0;
+  openSheet({
+    title: '长时计时提醒',
+    sub: '忘记结束计时很常见。满这个时长后，通知栏会问一句「还在继续吗」，并轻震一下。',
+    body: `<div class="seg-ctrl" data-lw>${LONG_WARN_CHOICES.map(([v, l]) => `<button class="${v === cur ? 'on' : ''}" data-v="${v}">${l}</button>`).join('')}</div>`,
+    onMount(sheet, { close }) {
+      sheet.addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-lw] button');
+        if (!b) return;
+        const v = Number(b.dataset.v);
+        await saveSettings({ longWarnH: v });
+        close();
+        window.__app.render();
+        toast(v ? `计时满 ${v} 小时会提醒一次` : '长时计时提醒已关闭');
       });
     },
   });

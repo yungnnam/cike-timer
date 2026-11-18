@@ -5,6 +5,53 @@ All notable changes to 此刻 / Cike.
 The build stamp shown under *Me → About → Build* (`cike-vNN`) identifies the asset bundle and
 changes on every build, independently of the semantic version.
 
+## v1.3.0 — 2026-11-17
+
+- **Added**: tag filter on the Records page — the chip row gains a "标签" chip that opens a
+  sheet listing every tag with its entry count and time; picking one narrows the list and the
+  range summary, and "不限标签" clears it. Tags are now shown on each row (up to four, then
+  "+N").
+- **Added**: a tag breakdown card on the Stats page. Each tag's time inside the current range
+  is summed — a record with several tags splits its time evenly — and shown as a bar with the
+  share of the range.
+- **Added**: a long-run reminder. After 2 / 4 / 8 hours (4 by default, "关闭" to turn it off)
+  the ongoing entry triggers once: the notification subtitle becomes "「学习」已计时 4 小时，
+  还在继续吗？" and the phone vibrates briefly. The schedule lives in the native
+  `TimerService`, because a backgrounded WebView throttles its timers — otherwise the reminder
+  would never fire while the phone is in a pocket.
+- **Added**: entries longer than 12 hours are marked "可能忘了停" on the Records page.
+- **Changed**: backfilling is now duration-first. The sheet opens in "按时长" mode with six
+  presets (15 / 30 / 45 / 60 / 90 / 120), a −/+ stepper and the end time; the start time is
+  computed, shown as "13:53 – 14:23 · 30分". The last used duration is remembered, and "按时间"
+  still exposes both pickers for exact times.
+- **Changed**: the tags field in the record editor suggests tags that were used before and
+  accepts several at once (comma or Enter), each removed with ×. Tags that are only punctuation
+  are rejected.
+- **Fixed**: leader lines on the ring and pie charts are routed outside the circle and staggered
+  per side, so neighbouring labels no longer touch and no line crosses a slice.
+
+## v1.3.2 — 2026-11-18
+
+- **Fixed**: chart text was hard to read on a phone. The duration labels outside the pie and
+  ring now use the normal text colour at 600 weight and lost the 2.6 px outline that was
+  swallowing the thin strokes at 9.5 px; bar-chart category names are plain white.
+
+## v1.3.1 — 2026-11-17
+
+- **Added**: three in-app demos under Me → Demo (backfill, tags, long-run reminder). Each one
+  plays three or four keyframes of the real controls at reduced scale, with a tap highlight —
+  no video files, so the APK stays small and nothing needs to be decoded on a slow phone.
+- **Changed**: sheets open and close faster — the slide is 300 ms instead of 380, and the glass
+  blur behind the sheet and the dim layer is lighter, which is what made opening feel sticky on
+  a phone.
+- **Changed**: the four figures under the main chart (daily average, entries, longest,
+  unrecorded) are more compact, leaving room for a larger pie and ring — the diameter grew by
+  about 13%.
+- **Changed**: bar-chart labels use the normal text colour instead of the dimmed secondary
+  colour, and the bars are thicker.
+- **Added**: a "Colour key" fold under the Breakdown card and under the weekly rhythm — a
+  two-column list of swatch, name and duration, for when two categories look alike.
+
 ## v1.2.6 — 2026-11-14
 
 - **Added**: a local profile at the top of the Me page — a name (up to 24 characters) and an

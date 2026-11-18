@@ -21,6 +21,8 @@ export const DEFAULT_SETTINGS = {
   dayStart: 0,      // 一天的起点（0-6 点）
   weekStart: 1,     // 1 = 周一
   minDur: 0,        // 短于 N 秒的记录自动丢弃，0 = 不丢弃
+  lastDur: 30,      // 补记时默认的时长（分钟），会记住上次用的
+  longWarnH: 4,     // 计时满几个小时提醒一次「还在继续吗」，0 = 不提醒
   lastType: null,
   seeded: false,
   groupMigrated: false, // 老数据是否已经按新结构归好分组

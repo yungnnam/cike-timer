@@ -56,6 +56,77 @@ const EN = {
   '可从内置图标或相册选择头像；图片会压缩为 128×128 保存在本机。':
     'Pick a built-in icon or a photo; images are resized to 128×128 and stored on this device.',
 
+  /* ---------- 功能演示 ---------- */
+  '演示': 'Demo',
+  '补记演示': 'Backfill demo',
+  '标签演示': 'Tags demo',
+  '长时提醒演示': 'Long-run reminder demo',
+  '忘开计时的时候，用补记把这一段补上': 'Use backfill to fill in a stretch you forgot to time',
+  '标签是跨类型的横向归类：同一件事换着类型记，也能一起看':
+    'Tags cut across types: the same activity recorded under different types still adds up',
+  '忘记点结束的时候，让通知栏替你想一句':
+    'When you forget to stop, the notification asks for you',
+  '选类型、填时长，开始时间自动算好': 'Pick a type, enter a duration — the start time is computed',
+  '加标签、按标签筛选、统计里的标签卡': 'Add tags, filter by tag, and the tag card in Stats',
+  '忘记停表时，通知栏会问一句': 'When you forget to stop, the notification asks',
+  '重播': 'Replay',
+  '选一个类型，再填上时长 —— 先选后填，顺序无所谓':
+    'Pick a type, then a duration — order does not matter',
+  '开始时间会自动算好，不用手动对齐到几点几分':
+    'The start time is computed for you — no need to line it up by hand',
+  '点「记下」，这段就补进了今天的记录': 'Tap “Log” and the stretch joins today’s entries',
+  '记录时输入标签，回车即添加；以前用过的会提示':
+    'Type a tag while recording and press Enter; previously used tags are suggested',
+  '记录页顶部点「标签」，只看带这个标签的记录':
+    'Tap “Tag” at the top of Records to see only entries with that tag',
+  '统计页把每个标签的时长单列成一张卡片': 'Stats lists each tag’s time on its own card',
+  '一直在计时，自己忘了停': 'The timer kept running and you forgot about it',
+  '到点后通知栏换成这句话，手机轻震一次':
+    'At the mark the notification switches to this line and the phone buzzes once',
+  '档位在「我的 → 长时计时提醒」，可以关掉':
+    'The threshold lives in Me → Long-run reminder, and can be turned off',
+  '计时满多久提醒一次': 'Remind after',
+  '学习中': 'Studying',
+  '15分': '15m',
+  '30分': '30m',
+  '45分': '45m',
+  '已记下 30分': 'Logged 30m',
+  '学习 · 4:00:00': 'Study · 4:00:00',
+  '深度': 'Deep work',
+  '复习': 'Review',
+  '读书': 'Reading',
+  '专注': 'Focus',
+
+  /* ---------- 补记表单与标签 ---------- */
+  '填时长就行，开始时间会自动算好': 'Just fill in the duration — the start time works itself out',
+  '按时长': 'Duration',
+  '按时间': 'Times',
+  '减少 5 分钟': '5 min less',
+  '增加 5 分钟': '5 min more',
+  '输入后回车，可加多个': 'Type, then Enter — you can add several',
+  '删除标签': 'Remove tag',
+  '时间不对，检查一下': 'Those times don’t add up — please check',
+  '结束时间不能晚于现在': 'The end time can’t be later than now',
+  '保存后，这条记录会结束计时。': 'Saving will stop the timer for this entry.',
+  '标签是所有记录共用的横向归类': 'Tags cut across every entry',
+  '按标签筛选': 'Filter by tag',
+  '可能忘了停': 'Probably forgot to stop',
+  '时长': 'Duration',
+  '标签用来横向归类（如「深度」「复习」）：记录页可按标签筛选，统计页会汇总':
+    'Tags cut across types (e.g. “Deep work”, “Review”): the log filters by tag, and stats sum them up',
+
+  /* ---------- 长时计时提醒 ---------- */
+  '长时计时提醒': 'Long-running reminder',
+  '计时超过这个时长，提醒一次「还在继续吗」':
+    'Ask “still going?” once the timer passes this long',
+  '关闭': 'Off',
+  '忘记结束计时很常见。满这个时长后，通知栏会问一句「还在继续吗」，并轻震一下。':
+    'Forgetting to stop is common. Once it runs this long, the notification asks “still going?” and buzzes once.',
+  '长时计时提醒已关闭': 'Long-running reminder turned off',
+  '2 小时': '2 hours',
+  '4 小时': '4 hours',
+  '8 小时': '8 hours',
+
   /* ---------- 类型编辑 ---------- */
   '名字': 'Name',
   '例如：学习': 'e.g. Study',
@@ -70,6 +141,7 @@ const EN = {
   '同一分组内可用不同深浅区分，统计图中保持同一色系。':
     'Use different shades within a group; charts keep them in one hue family.',
   '颜色': 'Colour',
+  '颜色对照': 'Colour key',
   '图标': 'Icon',
   '新建分组': 'New group',
   '新建类型': 'New type',
@@ -452,6 +524,13 @@ const EN = {
 /* 带数字的句子：格式函数已经按语言生成数字部分，这里只补句子骨架 */
 const RULES = [
   // 先放「整句最长」的规则：拆开写的话会被下面更短的规则先抢走
+  [/^「(.+)」已计时 (\d+) 小时，还在继续吗？$/, (m) => `“${t(m[1])}” has been running ${m[2]} h — still going?`],
+  [/^已计时 (\d+) 小时，还在继续吗？$/, (m) => `Running ${m[1]} h — still going?`],
+  [/^计时满 (\d+) 小时会提醒一次$/, (m) => `Remind me after ${m[1]} h`],
+  [/^另有 (\d+) 个标签未列出$/, (m) => `${m[1]} more tags not listed`],
+  [/^(\d+) 项$/, (m) => `${m[1]} items`],
+  [/^(\d+) 个 · 占范围内时长$/, (m) => `${m[1]} · share of the range`],
+  [/^标签 · (.+)$/, (m) => `Tag · ${t(m[1])}`],
   [/^(每周|每天)(至少|不超过) (.+) · 现在 (.+)$/, (m) => `${m[1] === '每周' ? 'At least' : 'At most'} ${t(m[3])} ${m[1] === '每周' ? 'a week' : 'a day'} · now ${t(m[4])}`],
   [/^(.+) · 共 (.+) · 比上期 ([+−-]?\d+)% · 最投入 (\d+)–(\d+) 点$/, (m) => `${t(m[1])} · ${m[2]} total · ${m[3]}% vs previous · busiest ${m[4]}:00–${m[5]}:00`],
   [/^(.+) · 共 (.+) · 比上期 ([+−-]?\d+)%$/, (m) => `${t(m[1])} · ${m[2]} total · ${m[3]}% vs previous`],
